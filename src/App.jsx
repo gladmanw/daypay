@@ -598,20 +598,46 @@ function SetupScreen({ onComplete }) {
   );
 }
 
+// ─── localStorage helpers ─────────────────────────────────────────────────────
+const STORAGE_KEY = "daypay_v1";
+
+function loadAll() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function saveAll(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("Storage failed:", e);
+  }
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function DayPay() {
-  const [setup, setSetup]             = useState(null);
-  const [display, setDisplay]         = useState("0");   // current expense being typed
-  const [expenses, setExpenses]       = useState([]);
-  const [label, setLabel]             = useState("");
-  const [history, setHistory]         = useState([]);
-  const [unlocked, setUnlocked]       = useState([]);
-  const [newTrophy, setNewTrophy]     = useState(null);
-  const [confetti, setConfetti]       = useState(false);
+  const saved = loadAll();
+
+  const [setup, setSetup]           = useState(saved?.setup    ?? null);
+  const [display, setDisplay]       = useState("0");
+  const [expenses, setExpenses]     = useState(saved?.expenses ?? []);
+  const [label, setLabel]           = useState("");
+  const [history, setHistory]       = useState(saved?.history  ?? []);
+  const [unlocked, setUnlocked]     = useState(saved?.unlocked ?? []);
+  const [newTrophy, setNewTrophy]   = useState(null);
+  const [confetti, setConfetti]     = useState(false);
   const [showSettings, setShowSettings]   = useState(false);
   const [showHistory, setShowHistory]     = useState(false);
   const [showTrophies, setShowTrophies]   = useState(false);
   const labelRef = useRef(null);
+
+  // Save everything as one object whenever anything changes
+  useEffect(() => {
+    saveAll({ setup, expenses, history, unlocked });
+  }, [setup, expenses, history, unlocked]);
 
   if (!setup) return <SetupScreen onComplete={setSetup} />;
 
