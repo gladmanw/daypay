@@ -185,7 +185,7 @@ function TrophyToast({ trophy, onClose }) {
 function NumPad({ onKey }) {
   return (
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px"}}>
-      {["7","8","9","4","5","6","1","2","3","⌫","0","."].map(k=>(
+      {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(k=>(
         <button key={k} onClick={()=>onKey(k)} style={{
           padding:"18px 0",borderRadius:"16px",border:"none",
           background:k==="⌫"?"rgba(248,113,113,0.1)":"rgba(255,255,255,0.06)",
