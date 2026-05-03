@@ -49,17 +49,17 @@ function getNextPayday(schedule, customDate) {
   }
 
   if (schedule === "every_2_weeks") {
-    // If user has set an anchor payday date, step forward in 14-day increments
+    // If user has set an anchor payday date, step forward in 14-day increments from that anchor
     if (customDate) {
       let anchor = new Date(customDate+"T00:00:00");
       while (anchor <= today) anchor.setDate(anchor.getDate() + 14);
       return toISO(anchor);
     }
-    // No anchor - find the next Friday
+    // No anchor - find the next Friday, then add 7 more days to make it every OTHER Friday
     let d = new Date(today);
     const dow = d.getDay();
     const daysToFri = (dow <= 5) ? (5 - dow) : 6;
-    d.setDate(d.getDate() + (daysToFri === 0 ? 7 : daysToFri));
+    d.setDate(d.getDate() + (daysToFri === 0 ? 7 : daysToFri) + 7);
     return toISO(d);
   }
 
