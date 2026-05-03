@@ -696,6 +696,7 @@ export default function DayPay() {
   const [daySummary,      setDaySummary]      = useState(saved?.pendingSummary  ?? null);
   const [paydayModal,     setPaydayModal]     = useState(saved?.pendingPayday   ?? null);
   const [lastClosedDate,  setLastClosedDate]  = useState(saved?.lastClosedDate  ?? todayISO());
+  const [showBudgetTip,   setShowBudgetTip]   = useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
@@ -830,8 +831,6 @@ export default function DayPay() {
     setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt}]);
     setDisplay("0"); setLabel(""); setShowCalc(false);
   };
-
-  const [showBudgetTip, setShowBudgetTip] = useState(false);
 
   return (
     <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 20% 10%,#0e1a10 0%,#080f12 55%,#0a0a18 100%)",fontFamily:"'DM Sans',sans-serif",color:"#fff",display:"flex",flexDirection:"column",maxWidth:"420px",margin:"0 auto",padding:"20px 20px 32px",position:"relative"}}>
