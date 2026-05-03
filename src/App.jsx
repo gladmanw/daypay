@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 // ─── Currencies ───────────────────────────────────────────────────────────────
 const CURRENCIES = [
@@ -310,6 +310,12 @@ function PaydayModal({ sym, suggestedBalance, onConfirm }) {
 
 // ─── History Sheet ────────────────────────────────────────────────────────────
 function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
+  const [translateY, setTranslateY] = React.useState(0);
+  const startY = React.useRef(null);
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
+  const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
+
   if (!open) return null;
   const grouped = {};
   [...history].reverse().forEach(h=>{
@@ -322,9 +328,12 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
   return (
     <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
       <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
-      <div style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"85vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
-          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.15)"}}/>
+      <div
+        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"85vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      >
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
         </div>
         <div style={{padding:"0 24px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
@@ -385,13 +394,29 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
 
 // ─── Trophies Sheet ───────────────────────────────────────────────────────────
 function TrophiesSheet({ open, onClose, unlocked, allTimeTrophies }) {
+  const [translateY, setTranslateY] = React.useState(0);
+  const startY = React.useRef(null);
+
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const handleTouchMove  = (e) => {
+    const dy = e.touches[0].clientY - startY.current;
+    if (dy > 0) setTranslateY(dy);
+  };
+  const handleTouchEnd   = () => {
+    if (translateY > 80) { setTranslateY(0); onClose(); }
+    else setTranslateY(0);
+  };
+
   if (!open) return null;
   return (
     <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
       <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
-      <div style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"85vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
-          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.15)"}}/>
+      <div
+        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"85vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      >
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
         </div>
         <div style={{padding:"0 24px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
@@ -426,6 +451,12 @@ function TrophiesSheet({ open, onClose, unlocked, allTimeTrophies }) {
 
 // ─── Settings Sheet ───────────────────────────────────────────────────────────
 function SettingsSheet({ open, onClose, setup, onSave }) {
+  const [translateY, setTranslateY] = React.useState(0);
+  const startY = React.useRef(null);
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
+  const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
+
   const [balance,   setBalance]   = useState(String(setup.currentBalance));
   const [salary,    setSalary]    = useState(String(setup.monthlySalary));
   const [currency,  setCurrency]  = useState(setup.currency);
@@ -452,9 +483,12 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
   return (
     <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
       <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
-      <div style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"92vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
-          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.15)"}}/>
+      <div
+        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"92vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      >
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
         </div>
         <div style={{padding:"0 24px"}}>
           <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",marginBottom:"24px",color:"#fff"}}>Settings</div>
