@@ -562,7 +562,7 @@ function SetupScreen({ onComplete }) {
     <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 30% 15%,#1a1040 0%,#0a0a18 55%,#0d1a0a 100%)",display:"flex",flexDirection:"column",padding:"32px 24px",fontFamily:"'DM Sans',sans-serif",color:"#fff",maxWidth:"420px",margin:"0 auto",overflowY:"auto"}}>
       <div style={{textAlign:"center",marginBottom:"24px"}}>
         <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"38px",fontWeight:"700",letterSpacing:"-0.5px"}}>Day Pay</div>
-        <div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)",marginTop:"4px"}}>Smart budgets · Real rewards</div>
+        <div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)",marginTop:"4px"}}>Budgeting that makes every day, Pay Day</div>
       </div>
 
       {/* Step dots */}
