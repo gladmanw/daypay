@@ -979,11 +979,60 @@ export default function DayPay() {
         )}
       </div>
 
-      {/* ── ADD EXPENSE BUTTON ── */}
+      {/* ── ADD EXPENSE BUTTON + TROPHY CABINET ── */}
       {!showCalc&&(
-        <button onClick={()=>setShowCalc(true)} style={{width:"100%",padding:"18px",marginBottom:"12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"20px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
-          <span style={{fontSize:"20px"}}>+</span> Add Expense
-        </button>
+        <>
+          <button onClick={()=>setShowCalc(true)} style={{width:"100%",padding:"18px",marginBottom:"16px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"20px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+            <span style={{fontSize:"20px"}}>+</span> Add Expense
+          </button>
+
+          {/* Trophy Cabinet */}
+          <div style={{
+            background:"rgba(255,255,255,0.02)",
+            border:"1px solid rgba(255,255,255,0.06)",
+            borderRadius:"22px",padding:"18px 20px",flex:1
+          }}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2.5px",textTransform:"uppercase"}}>Trophy Cabinet</div>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)"}}>{unlocked.length}/{TROPHIES.length} this period</div>
+            </div>
+
+            {unlocked.length === 0 ? (
+              <div style={{textAlign:"center",padding:"24px 0"}}>
+                <div style={{fontSize:"36px",marginBottom:"10px",opacity:0.3}}>🏆</div>
+                <div style={{fontSize:"13px",color:"rgba(255,255,255,0.25)",lineHeight:1.6}}>
+                  Stay under budget to<br/>start earning trophies
+                </div>
+              </div>
+            ) : (
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px"}}>
+                {TROPHIES.map(t=>{
+                  const earned = unlocked.includes(t.id);
+                  return (
+                    <div key={t.id} style={{
+                      background: earned ? "rgba(255,215,0,0.07)" : "rgba(255,255,255,0.025)",
+                      border: `1px solid ${earned ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.05)"}`,
+                      borderRadius:"16px",padding:"14px 8px",
+                      textAlign:"center",
+                      filter: earned ? "none" : "grayscale(1) opacity(0.2)",
+                      transition:"all 0.3s"
+                    }}>
+                      <div style={{fontSize:"28px",marginBottom:"6px",filter:earned?"drop-shadow(0 0 6px rgba(255,215,0,0.4))":"none"}}>{t.icon}</div>
+                      <div style={{fontSize:"10px",color:earned?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.25)",fontWeight:"600",lineHeight:1.3}}>{t.name}</div>
+                      {earned&&<div style={{fontSize:"9px",color:"#FFD700",marginTop:"4px",letterSpacing:"1px"}}>✓</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {allTimeTrophies > 0 && (
+              <div style={{marginTop:"14px",paddingTop:"12px",borderTop:"1px solid rgba(255,255,255,0.05)",textAlign:"center",fontSize:"12px",color:"rgba(255,215,0,0.5)"}}>
+                🏅 {allTimeTrophies} earned all time
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* ── CALCULATOR ── */}
