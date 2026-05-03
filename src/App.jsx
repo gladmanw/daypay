@@ -181,6 +181,179 @@ function TrophyToast({ trophy, onClose }) {
   );
 }
 
+
+// ─── Custom Trophy Creator ────────────────────────────────────────────────────
+const TROPHY_EMOJIS = ["⭐","🌟","💫","🎖️","🥇","🥈","🥉","🏅","🎯","🎪","🚀","💪","🔥","⚡","💎","👑","🦁","🐯","🦊","🐺","🌈","☀️","🍀","🌸","🎵","🎸","🍕","🏋️","🧘","🤸","🏃","🚴"];
+
+const CUSTOM_CONDITIONS = [
+  { id:"under_budget_days",  label:"Stay under budget X days in a row", hasValue:true,  unit:"days",    desc:(v)=>`${v}-day streak under budget` },
+  { id:"spend_less_than",    label:"Spend less than a set amount in a day", hasValue:true, unit:"amount", desc:(v,sym)=>`Spend less than ${sym}${v} in a day` },
+  { id:"spend_pct_of_budget",label:"Spend less than X% of daily budget", hasValue:true,  unit:"%",      desc:(v)=>`Spend less than ${v}% of daily budget` },
+  { id:"total_wins",         label:"Reach X total days under budget",    hasValue:true,  unit:"days",    desc:(v)=>`${v} total days under budget` },
+  { id:"save_amount",        label:"Save more than a set amount in a day", hasValue:true, unit:"amount", desc:(v,sym)=>`Save more than ${sym}${v} in one day` },
+  { id:"log_expenses",       label:"Log more than X expenses in a day",  hasValue:true,  unit:"expenses",desc:(v)=>`Log ${v}+ expenses in a day` },
+];
+
+function checkCustomTrophy(trophy, stats, sym) {
+  const v = parseFloat(trophy.conditionValue) || 0;
+  switch(trophy.conditionId) {
+    case "under_budget_days":   return stats.streak >= v;
+    case "spend_less_than":     return stats.todaySpent < v && stats.totalWins >= 1;
+    case "spend_pct_of_budget": return stats.lastRatio * 100 <= v && stats.totalWins >= 1;
+    case "total_wins":          return stats.totalWins >= v;
+    case "save_amount":         return stats.lastSaving >= v;
+    case "log_expenses":        return stats.todayExpenseCount >= v;
+    default: return false;
+  }
+}
+
+function CreateTrophyModal({ open, onClose, onSave, sym }) {
+  const [step,      setStep]      = useState(0); // 0=icon, 1=name, 2=condition
+  const [icon,      setIcon]      = useState("⭐");
+  const [name,      setName]      = useState("");
+  const [condId,    setCondId]    = useState("under_budget_days");
+  const [condValue, setCondValue] = useState("3");
+
+  const reset = () => { setStep(0); setIcon("⭐"); setName(""); setCondId("under_budget_days"); setCondValue("3"); };
+  const cond  = CUSTOM_CONDITIONS.find(c=>c.id===condId);
+  const desc  = cond ? cond.desc(condValue, sym) : "";
+  const canSave = name.trim().length > 0 && condValue;
+
+  if (!open) return null;
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(6,6,18,0.92)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:260,backdropFilter:"blur(10px)"}}>
+      <div style={{
+        background:"linear-gradient(180deg,#111827,#0d1117)",
+        borderRadius:"28px 28px 0 0",padding:"0 0 48px",
+        width:"100%",maxWidth:"420px",maxHeight:"90vh",overflowY:"auto",
+        animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"
+      }}>
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.2)"}}/>
+        </div>
+        <div style={{padding:"0 24px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>Create Trophy</div>
+            <button onClick={()=>{reset();onClose();}} style={{background:"rgba(255,255,255,0.06)",border:"none",borderRadius:"10px",padding:"8px 12px",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:"14px"}}>Cancel</button>
+          </div>
+
+          {/* Step dots */}
+          <div style={{display:"flex",gap:"6px",marginBottom:"24px"}}>
+            {["Icon","Name","Condition"].map((s,i)=>(
+              <div key={i} style={{flex:1}}>
+                <div style={{height:"3px",borderRadius:"2px",background:i<=step?"#A78BFA":"rgba(255,255,255,0.1)",transition:"background 0.3s"}}/>
+                <div style={{fontSize:"9px",color:i===step?"#A78BFA":"rgba(255,255,255,0.25)",marginTop:"4px",textAlign:"center"}}>{s}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Step 0 — Pick icon */}
+          {step===0&&(
+            <div style={{animation:"slideUp 0.3s ease"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>Pick an icon</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:"8px",marginBottom:"24px",maxHeight:"240px",overflowY:"auto"}}>
+                {TROPHY_EMOJIS.map(e=>(
+                  <button key={e} onClick={()=>setIcon(e)} style={{
+                    padding:"12px 4px",borderRadius:"12px",border:"none",fontSize:"24px",
+                    background:icon===e?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.04)",
+                    border:`1px solid ${icon===e?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.06)"}`,
+                    cursor:"pointer",transition:"all 0.15s"
+                  }}>{e}</button>
+                ))}
+              </div>
+              <div style={{background:"rgba(255,255,255,0.04)",borderRadius:"16px",padding:"16px",textAlign:"center",marginBottom:"20px"}}>
+                <div style={{fontSize:"52px",marginBottom:"6px"}}>{icon}</div>
+                <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>Your trophy icon</div>
+              </div>
+              <button onClick={()=>setStep(1)} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:"pointer"}}>Next →</button>
+            </div>
+          )}
+
+          {/* Step 1 — Name */}
+          {step===1&&(
+            <div style={{animation:"slideUp 0.3s ease"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>Name your trophy</div>
+              <div style={{textAlign:"center",marginBottom:"20px"}}>
+                <div style={{fontSize:"52px",marginBottom:"6px"}}>{icon}</div>
+              </div>
+              <input
+                autoFocus
+                placeholder="e.g. Weekend Warrior"
+                value={name}
+                onChange={e=>setName(e.target.value)}
+                maxLength={30}
+                style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"14px",padding:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"18px",outline:"none",marginBottom:"8px",boxSizing:"border-box",textAlign:"center"}}
+              />
+              <div style={{fontSize:"12px",color:"rgba(255,255,255,0.25)",textAlign:"right",marginBottom:"20px"}}>{name.length}/30</div>
+              <div style={{display:"flex",gap:"10px"}}>
+                <button onClick={()=>setStep(0)} style={{padding:"16px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"16px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>←</button>
+                <button onClick={()=>{if(name.trim())setStep(2);}} disabled={!name.trim()} style={{flex:1,padding:"16px",background:name.trim()?"linear-gradient(135deg,#A78BFA,#7C3AED)":"rgba(255,255,255,0.05)",border:"none",borderRadius:"16px",color:name.trim()?"#fff":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:name.trim()?"pointer":"default"}}>Next →</button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 — Condition */}
+          {step===2&&(
+            <div style={{animation:"slideUp 0.3s ease"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>How do you earn it?</div>
+
+              <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"16px"}}>
+                {CUSTOM_CONDITIONS.map(c=>(
+                  <button key={c.id} onClick={()=>setCondId(c.id)} style={{
+                    padding:"14px 16px",borderRadius:"14px",border:"none",textAlign:"left",
+                    background:condId===c.id?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",
+                    border:`1px solid ${condId===c.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,
+                    color:condId===c.id?"#34D399":"rgba(255,255,255,0.55)",
+                    fontFamily:"'DM Sans',sans-serif",fontSize:"13px",fontWeight:"600",cursor:"pointer"
+                  }}>{c.label}</button>
+                ))}
+              </div>
+
+              {/* Value input */}
+              {cond?.hasValue&&(
+                <div style={{marginBottom:"16px"}}>
+                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>
+                    {cond.unit==="amount"?`Amount (${sym})`:cond.unit==="%" ? "Percentage" : cond.unit==="days"?"Number of days":"Number"}
+                  </div>
+                  <input
+                    type="number"
+                    value={condValue}
+                    onChange={e=>setCondValue(e.target.value)}
+                    style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px 16px",color:"#fff",fontFamily:"'Cormorant Garamond',serif",fontSize:"28px",fontWeight:"700",outline:"none",boxSizing:"border-box",textAlign:"center"}}
+                  />
+                </div>
+              )}
+
+              {/* Preview */}
+              <div style={{background:"rgba(255,215,0,0.07)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:"14px",padding:"14px 16px",marginBottom:"20px",display:"flex",alignItems:"center",gap:"12px"}}>
+                <span style={{fontSize:"28px"}}>{icon}</span>
+                <div>
+                  <div style={{fontWeight:"700",color:"#fff",fontSize:"15px"}}>{name}</div>
+                  <div style={{fontSize:"12px",color:"rgba(255,255,255,0.5)",marginTop:"2px"}}>{desc}</div>
+                </div>
+              </div>
+
+              <div style={{display:"flex",gap:"10px"}}>
+                <button onClick={()=>setStep(1)} style={{padding:"16px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"16px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>←</button>
+                <button onClick={()=>{
+                  if(canSave){
+                    onSave({id:`custom_${Date.now()}`,icon,name:name.trim(),desc,conditionId:condId,conditionValue:condValue,custom:true});
+                    reset();
+                    onClose();
+                  }
+                }} disabled={!canSave} style={{flex:1,padding:"16px",background:canSave?"linear-gradient(135deg,#FFD700,#F59E0B)":"rgba(255,255,255,0.05)",border:"none",borderRadius:"16px",color:canSave?"#111":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:canSave?"pointer":"default",boxShadow:canSave?"0 6px 24px rgba(255,215,0,0.25)":"none"}}>
+                  Create Trophy ✨
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── NumPad ───────────────────────────────────────────────────────────────────
 function NumPad({ onKey }) {
   return (
@@ -393,7 +566,7 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
 }
 
 // ─── Trophies Sheet ───────────────────────────────────────────────────────────
-function TrophiesSheet({ open, onClose, unlocked, allTimeTrophies }) {
+function TrophiesSheet({ open, onClose, unlocked, allTimeTrophies, customTrophies, onCreateTrophy, onDeleteCustom }) {
   const [translateY, setTranslateY] = React.useState(0);
   const startY = React.useRef(null);
 
@@ -424,7 +597,9 @@ function TrophiesSheet({ open, onClose, unlocked, allTimeTrophies }) {
             <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>{unlocked.length}/{TROPHIES.length} this period</div>
           </div>
           {allTimeTrophies>0&&<div style={{fontSize:"12px",color:"#FFD700",marginBottom:"20px"}}>🏅 {allTimeTrophies} earned all time</div>}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"16px"}}>
+          {/* Built-in trophies */}
+          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Built-in</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"20px"}}>
             {TROPHIES.map(t=>{
               const got=unlocked.includes(t.id);
               return (
@@ -433,6 +608,33 @@ function TrophiesSheet({ open, onClose, unlocked, allTimeTrophies }) {
                   <div style={{fontWeight:"700",fontSize:"13px",color:"#fff",marginBottom:"4px"}}>{t.name}</div>
                   <div style={{fontSize:"11px",color:"rgba(255,255,255,0.38)",lineHeight:1.4}}>{t.desc}</div>
                   {got&&<div style={{marginTop:"6px",fontSize:"10px",color:"#FFD700",letterSpacing:"1px"}}>✓ UNLOCKED</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Custom trophies */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",letterSpacing:"2px",textTransform:"uppercase"}}>Custom</div>
+            <button onClick={onCreateTrophy} style={{background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"20px",padding:"5px 12px",color:"#A78BFA",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>+ Create</button>
+          </div>
+          {customTrophies?.length===0&&(
+            <div style={{textAlign:"center",padding:"20px",background:"rgba(255,255,255,0.02)",borderRadius:"14px",marginBottom:"16px"}}>
+              <div style={{fontSize:"24px",marginBottom:"6px",opacity:0.3}}>✨</div>
+              <div style={{fontSize:"12px",color:"rgba(255,255,255,0.25)"}}>No custom trophies yet</div>
+            </div>
+          )}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"16px"}}>
+            {(customTrophies||[]).map(t=>{
+              const got=unlocked.includes(t.id);
+              return (
+                <div key={t.id} style={{background:got?"rgba(255,215,0,0.07)":"rgba(255,255,255,0.025)",border:`1px solid ${got?"rgba(255,215,0,0.2)":"rgba(167,139,250,0.15)"}`,borderRadius:"18px",padding:"16px 12px",textAlign:"center",filter:got?"none":"opacity(0.6)",position:"relative"}}>
+                  <button onClick={()=>onDeleteCustom(t.id)} style={{position:"absolute",top:"8px",right:"8px",background:"rgba(248,113,113,0.15)",border:"none",borderRadius:"6px",width:"20px",height:"20px",color:"#F87171",cursor:"pointer",fontSize:"12px",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>×</button>
+                  <div style={{fontSize:"32px",marginBottom:"8px"}}>{t.icon}</div>
+                  <div style={{fontWeight:"700",fontSize:"13px",color:"#fff",marginBottom:"4px"}}>{t.name}</div>
+                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.38)",lineHeight:1.4}}>{typeof t.desc==="function"?t.desc():t.desc}</div>
+                  {got&&<div style={{marginTop:"6px",fontSize:"10px",color:"#FFD700",letterSpacing:"1px"}}>✓ UNLOCKED</div>}
+                  <div style={{marginTop:"4px",fontSize:"9px",color:"rgba(167,139,250,0.5)",letterSpacing:"0.5px"}}>CUSTOM</div>
                 </div>
               );
             })}
@@ -731,11 +933,13 @@ export default function DayPay() {
   const [paydayModal,     setPaydayModal]     = useState(saved?.pendingPayday   ?? null);
   const [lastClosedDate,  setLastClosedDate]  = useState(saved?.lastClosedDate  ?? todayISO());
   const [showBudgetTip,   setShowBudgetTip]   = useState(false);
+  const [customTrophies,  setCustomTrophies]  = useState(saved?.customTrophies  ?? []);
+  const [showCreateTrophy,setShowCreateTrophy]= useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,unlocked,allTimeTrophies,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate});
+    saveAll({setup,expenses,history,unlocked,allTimeTrophies,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,customTrophies});
   },[setup,expenses,history,unlocked,allTimeTrophies,daySummary,paydayModal,lastClosedDate]);
 
   // On app open — check if day has changed
@@ -800,16 +1004,28 @@ export default function DayPay() {
     // Trophy check
     const newStreak = isUnder ? (stored.history?.filter(h=>h.under).length>=0 ? (() => { let s2=0; const h=[...(stored.history??[]),summary]; for(let i=h.length-1;i>=0;i--){if(h[i].under)s2++;else break;} return s2; })() : 1) : 0;
     const newWins   = (stored.history??[]).filter(h=>h.under).length + (isUnder?1:0);
-    checkTrophiesInner(stored.unlocked??[], {
+    checkTrophiesInner(stored.unlocked??[], stored.customTrophies??[], {
       streak:newStreak, totalWins:newWins,
       lastSaving:Math.max(0,daily-spent),
-      lastRatio:daily>0?spent/daily:1
+      lastRatio:daily>0?spent/daily:1,
+      todaySpent:spent,
+      todayExpenseCount:ex.length
     });
   };
 
-  const checkTrophiesInner = (currentUnlocked, ns) => {
+  const checkTrophiesInner = (currentUnlocked, currentCustom, ns) => {
+    // Check built-in trophies
     TROPHIES.forEach(t=>{
       if(!currentUnlocked.includes(t.id)&&t.condition(ns)){
+        setUnlocked(prev=>prev.includes(t.id)?prev:[...prev,t.id]);
+        setNewTrophy(t);
+        setConfetti(true);
+        setTimeout(()=>setConfetti(false),3200);
+      }
+    });
+    // Check custom trophies
+    (currentCustom||[]).forEach(t=>{
+      if(!currentUnlocked.includes(t.id)&&checkCustomTrophy(t,ns)){
         setUnlocked(prev=>prev.includes(t.id)?prev:[...prev,t.id]);
         setNewTrophy(t);
         setConfetti(true);
@@ -887,6 +1103,13 @@ export default function DayPay() {
       <TrophyToast trophy={newTrophy} onClose={()=>setNewTrophy(null)}/>
 
       {/* Modals — priority order */}
+      <CreateTrophyModal
+        open={showCreateTrophy}
+        onClose={()=>setShowCreateTrophy(false)}
+        onSave={t=>setCustomTrophies(prev=>[...prev,t])}
+        sym={sym}
+      />
+
       {paydayModal && (
         <PaydayModal
           sym={sym}
@@ -907,7 +1130,7 @@ export default function DayPay() {
         setSetup(prev=>({...prev,...s,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
-      <TrophiesSheet open={showTrophies} onClose={()=>setShowTrophies(false)} unlocked={unlocked} allTimeTrophies={allTimeTrophies}/>
+      <TrophiesSheet open={showTrophies} onClose={()=>setShowTrophies(false)} unlocked={unlocked} allTimeTrophies={allTimeTrophies} customTrophies={customTrophies} onCreateTrophy={()=>setShowCreateTrophy(true)} onDeleteCustom={id=>setCustomTrophies(prev=>prev.filter(t=>t.id!==id))}/>
 
       {/* ── TOP BAR ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
@@ -1006,7 +1229,7 @@ export default function DayPay() {
               </div>
             ) : (
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px"}}>
-                {TROPHIES.map(t=>{
+                {[...TROPHIES,...customTrophies].map(t=>{
                   const earned = unlocked.includes(t.id);
                   return (
                     <div key={t.id} style={{
@@ -1023,6 +1246,17 @@ export default function DayPay() {
                     </div>
                   );
                 })}
+                {/* Create custom trophy button */}
+                <button onClick={()=>setShowCreateTrophy(true)} style={{
+                  padding:"14px 8px",borderRadius:"16px",
+                  background:"rgba(167,139,250,0.07)",
+                  border:"1px dashed rgba(167,139,250,0.3)",
+                  cursor:"pointer",textAlign:"center",
+                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"4px"
+                }}>
+                  <div style={{fontSize:"22px",color:"#A78BFA"}}>+</div>
+                  <div style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600",lineHeight:1.3}}>Create</div>
+                </button>
               </div>
             )}
 
