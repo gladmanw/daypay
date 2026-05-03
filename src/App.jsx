@@ -771,15 +771,6 @@ function SetupScreen({ onComplete }) {
   );
 }
 
-// ─── localStorage ─────────────────────────────────────────────────────────────
-const STORAGE_KEY = "daypay_v2";
-function loadAll() {
-  try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
-}
-function saveAll(data) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
-}
-
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function DayPay() {
   const saved = loadAll();
