@@ -1206,13 +1206,16 @@ export default function DayPay() {
     // If no locked budget yet, or it was set on a different day, recalculate and lock
     if(!stored?.lockedDailyBudget || stored?.lockedBudgetDate !== todayISO()){
       const d = daysUntilPayday(setup.nextPayday || getNextPayday(setup.paySchedule, setup.customPayDate));
-      const newLocked = d>0 ? setup.currentBalance/d : setup.currentBalance;
+      // Reconstruct start-of-day balance by adding back today's expenses and removing income
+      const todaySpent   = (stored?.expenses||[]).filter(e=>!e.isCreditCard&&!e.isIncome&&!e.isAutoBalancer).reduce((s,e)=>s+e.amount,0);
+      const todayInc     = (stored?.expenses||[]).filter(e=>e.isIncome&&e.destination==="main").reduce((s,e)=>s+e.amount,0);
+      const startBalance = setup.currentBalance + todaySpent - todayInc;
+      const newLocked    = d>0 ? parseFloat((startBalance/d).toFixed(2)) : startBalance;
       setLockedDailyBudget(newLocked);
-      // Save the date it was locked
       const all = loadAll()||{};
       saveAll({...all, lockedDailyBudget:newLocked, lockedBudgetDate:todayISO()});
     }
-  },[setup?.currentBalance]);
+  },[]);
 
   // Check every minute for midnight rollover
   useEffect(()=>{
@@ -1404,10 +1407,13 @@ export default function DayPay() {
       const destAcc = accounts.find(a=>a.id===incomeDestination);
       if(incomeDestination==="main"){
         setSetup(prev=>({...prev,currentBalance:prev.currentBalance+amt}));
-        // Income to main updates the locked daily budget too
+        // Income to main updates the locked daily budget
+        // New start-of-day balance = current locked * days + this income
         setLockedDailyBudget(prev=>{
-          const newBalance = (setup.currentBalance||0) + amt;
-          return days>0 ? newBalance/days : newBalance;
+          const currentLocked = prev ?? 0;
+          const startOfDay = currentLocked * days;
+          const newStart = startOfDay + amt;
+          return days>0 ? parseFloat((newStart/days).toFixed(2)) : newStart;
         });
       } else if(destAcc?.type==="credit"){
         if(incomeDeductBalance){
