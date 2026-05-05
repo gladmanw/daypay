@@ -1460,9 +1460,23 @@ export default function DayPay() {
       )}
 
       {/* Sheets */}
-      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat(Math.max(0,currentBalance-spent-creditPayoffDeductions).toFixed(2))}} onSave={s=>{
+      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat((currentBalance-spent).toFixed(2))}} onSave={s=>{
         const np = getNextPayday(s.paySchedule, s.customPayDate);
-        setSetup(prev=>({...prev,...s,nextPayday:np}));
+        // Reverse-engineer the true base currentBalance so the front screen shows
+        // exactly what the user typed, with all existing transactions intact.
+        //
+        // Front screen display = currentBalance - spent - creditPayoffDeductions + todayIncome
+        // So: currentBalance = newDisplayBalance + spent + creditPayoffDeductions - todayIncome
+        //
+        // Note: credit card charges (isCreditCard) don't affect currentBalance so excluded.
+        // Credit payoffs with deductBalance=true DO reduce currentBalance so included.
+        // Secondary account expenses don't touch currentBalance so excluded.
+        // Income to main adds to currentBalance so subtracted back.
+        const newDisplayBalance = s.currentBalance;
+        const trueBase = parseFloat((
+          newDisplayBalance + spent + creditPayoffDeductions - todayIncome
+        ).toFixed(2));
+        setSetup(prev=>({...prev,...s,currentBalance:trueBase,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
       <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym} accounts={accounts}
