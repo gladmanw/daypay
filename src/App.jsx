@@ -1543,21 +1543,25 @@ export default function DayPay() {
             setExpenses(p=>p.filter(x=>x.id!==e.id));
           };
 
-          const Pill = ({e}) => (
-            <div style={{
-              display:"flex",alignItems:"center",gap:"6px",
-              padding:"5px 10px 5px 8px",borderRadius:"50px",fontSize:"12px",
-              background:e.isIncome?"rgba(52,211,153,0.1)":e.isCreditCard?"rgba(167,139,250,0.07)":"rgba(248,113,113,0.07)",
-              border:`1px solid ${e.isIncome?"rgba(52,211,153,0.25)":e.isCreditCard?"rgba(167,139,250,0.2)":"rgba(248,113,113,0.2)"}`,
-              color:"rgba(255,255,255,0.85)"
-            }}>
-              <span>{e.label}</span>
-              <span style={{fontWeight:"700",color:e.isIncome?"#34D399":e.isCreditCard?"#A78BFA":"#F87171"}}>
-                {e.isIncome?"+":`-`}{sym}{e.amount.toFixed(2)}
-              </span>
-              <button onClick={()=>deletePill(e)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
-            </div>
-          );
+          const Pill = ({e}) => {
+            const isCreditRelated = e.isCreditCard || e.isCreditPayoff;
+            return (
+              <div style={{
+                display:"flex",alignItems:"center",gap:"6px",
+                padding:"5px 10px 5px 8px",borderRadius:"50px",fontSize:"12px",
+                background:e.isIncome?"rgba(52,211,153,0.1)":e.isCreditCard?"rgba(167,139,250,0.07)":"rgba(248,113,113,0.07)",
+                border:`1px solid ${e.isIncome?"rgba(52,211,153,0.25)":e.isCreditCard?"rgba(167,139,250,0.2)":"rgba(248,113,113,0.2)"}`,
+                color:"rgba(255,255,255,0.85)"
+              }}>
+                {isCreditRelated && <span style={{fontSize:"13px"}}>💳</span>}
+                <span>{e.label}</span>
+                <span style={{fontWeight:"700",color:e.isIncome?"#34D399":e.isCreditCard?"#A78BFA":"#F87171"}}>
+                  {e.isIncome?"+":`-`}{sym}{e.amount.toFixed(2)}
+                </span>
+                <button onClick={()=>deletePill(e)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
+              </div>
+            );
+          };
 
           const Section = ({label, icon, items, color}) => items.length===0?null:(
             <div style={{marginBottom:"8px"}}>
