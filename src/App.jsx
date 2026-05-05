@@ -1506,7 +1506,7 @@ export default function DayPay() {
             <button onClick={()=>setShowTransactions(v=>!v)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',background:'none',border:'none',cursor:'pointer',paddingBottom:'4px'}}>
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                 <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',letterSpacing:'1.5px',textTransform:'uppercase'}}>Transactions</span>
-                <span style={{background:'rgba(255,255,255,0.08)',borderRadius:'20px',padding:'2px 8px',fontSize:'11px',color:'rgba(255,255,255,0.45)',fontWeight:'600'}}>{expenses.filter(e=>!e.isAutoBalancer).length}</span>
+                <span style={{background:'rgba(255,255,255,0.08)',borderRadius:'20px',padding:'2px 8px',fontSize:'11px',color:'rgba(255,255,255,0.45)',fontWeight:'600'}}>{expenses.filter(e=>!e.isIncome||(e.isIncome&&!e.isCreditPayoff)||e.isAutoBalancer).length}</span>
               </div>
               <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                 <span style={{fontSize:'12px',color:'#F87171',fontWeight:'700'}}>-{sym}{effectiveSpent.toFixed(2)}</span>
@@ -1516,7 +1516,7 @@ export default function DayPay() {
           </div>
         )}
         {expenses.length>0&&showTransactions&&(()=>{
-          const mainExpenses   = expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&!e.account&&!e.isAutoBalancer);
+          const mainExpenses   = expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&!e.account);
           const accountExpenses= expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&e.account);
           const creditCharges  = expenses.filter(e=>e.isCreditCard);
           const incomeItems    = expenses.filter(e=>e.isIncome);
