@@ -937,6 +937,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
   const [currency,  setCurrency]  = useState(setup.currency);
   const [schedule,  setSchedule]  = useState(setup.paySchedule||"last_working_day");
   const [customDate,setCustomDate]= useState(setup.customPayDate||"");
+  const [showFaq,   setShowFaq]   = useState(false);
   const sym = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
 
   useEffect(()=>{
