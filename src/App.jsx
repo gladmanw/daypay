@@ -131,7 +131,7 @@ const TROPHIES = [
   { id:"seven_streak", icon:"⚡", name:"Lightning Saver",    desc:"7-day streak under budget",              condition:s=>s.streak>=7 },
   { id:"half_budget",  icon:"🎯", name:"Sharp Shooter",      desc:"Spend less than half your daily budget", condition:s=>s.lastRatio<=0.5&&s.totalWins>=1 },
   { id:"perfect_ten",  icon:"💎", name:"Diamond Discipline", desc:"10 total days under budget",             condition:s=>s.totalWins>=10 },
-  { id:"big_saver",    icon:"🏆", name:"Big Saver",          desc:"Save over 20 in a single day",           condition:s=>s.lastSaving>=20 },
+  { id:"big_saver",    icon:"🏆", name:"Big Saver",          desc:"Save over 50% of your daily budget",     condition:s=>s.lastRatio<=0.5&&s.lastSaving>0 },
 ];
 
 // ─── Confetti ─────────────────────────────────────────────────────────────────
