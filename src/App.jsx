@@ -1143,6 +1143,7 @@ export default function DayPay() {
   const [showCalc,        setShowCalc]        = useState(false);
   const [isIncome,        setIsIncome]        = useState(false);
   const [incomeDestination,setIncomeDestination]= useState("main"); // "main" or account id
+  const [incomeDeductBalance,setIncomeDeductBalance]= useState(true);
   const [showSettings,    setShowSettings]    = useState(false);
   const [showHistory,     setShowHistory]     = useState(false);
   const [showTrophies,    setShowTrophies]    = useState(false);
@@ -1291,7 +1292,8 @@ export default function DayPay() {
   const payday   = storedPayday || getNextPayday(paySchedule, customPayDate);
   const days     = daysUntilPayday(payday);
   const daily      = days>0 ? currentBalance/days : currentBalance;
-  const spent      = expenses.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((s,e)=>s+e.amount,0);
+  const spent        = expenses.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((s,e)=>s+e.amount,0);
+  const creditPayoffs= expenses.filter(e=>e.isCreditPayoff).reduce((s,e)=>s+e.amount,0);
   const todayIncome= expenses.filter(e=>e.isIncome&&e.destination==="main").reduce((s,e)=>s+e.amount,0);
   const remain     = daily - spent;
   const pct      = Math.min((spent/Math.max(daily,0.01))*100,100);
@@ -1316,18 +1318,23 @@ export default function DayPay() {
 
     if(isIncome){
       // Income: add to chosen destination
+      const destAcc = accounts.find(a=>a.id===incomeDestination);
       if(incomeDestination==="main"){
         setSetup(prev=>({...prev,currentBalance:prev.currentBalance+amt}));
+      } else if(destAcc?.type==="credit"){
+        if(incomeDeductBalance){
+          // Pay card AND deduct from main balance
+          setSetup(prev=>({...prev,currentBalance:prev.currentBalance-amt}));
+        }
+        // Always reduce card balance owed
+        setAccounts(prev=>prev.map(a=>a.id===incomeDestination?{...a,balance:Math.max(0,a.balance-amt)}:a));
       } else {
-        // Add to chosen secondary account (or reduce credit card balance)
-        setAccounts(prev=>prev.map(a=>{
-          if(a.id!==incomeDestination) return a;
-          return a.type==="credit"
-            ? {...a, balance:Math.max(0,a.balance-amt)}  // paying off credit = reduces balance
-            : {...a, balance:a.balance+amt};
-        }));
+        // Add to secondary account balance
+        setAccounts(prev=>prev.map(a=>a.id===incomeDestination?{...a,balance:a.balance+amt}:a));
       }
-      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:acc?.name||null,isIncome:true,destination:incomeDestination}]);
+      const destAccName = destAcc?.name||null;
+      const isCreditPayoff = destAcc?.type==="credit";
+      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:destAccName,isIncome:true,destination:incomeDestination,isCreditPayoff,deductBalance:incomeDeductBalance}]);
     } else {
       if(isCredit){
         // Credit card expense: ONLY increases balance owed on the card — does NOT affect daily budget
@@ -1341,7 +1348,7 @@ export default function DayPay() {
         }
       }
     }
-    setDisplay("0"); setLabel(""); setShowCalc(false); setIsIncome(false); setIncomeDestination("main");
+    setDisplay("0"); setLabel(""); setShowCalc(false); setIsIncome(false); setIncomeDestination("main"); setIncomeDeductBalance(true);
   };
 
   return (
@@ -1460,43 +1467,61 @@ export default function DayPay() {
           </div>
         </div>
 
-        {/* Active secondary account indicator */}
-        {activeAccount && accounts.find(a=>a.id===activeAccount) && (()=>{
-          const acc = accounts.find(a=>a.id===activeAccount);
-          const typeIcons = {savings:"🏦",credit:"💳",current:"🏧",investment:"📈"};
-          return (
-            <div style={{marginBottom:"8px",paddingBottom:"8px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:"6px"}}>
-                <span>{typeIcons[acc.type]||"🏦"}</span>
-                <span>{acc.name}</span>
+        {/* Always show credit card balances + active account */}
+        {accounts.filter(a=>a.type==="credit"||(activeAccount&&a.id===activeAccount&&a.type!=="credit")).length>0&&(
+          <div style={{marginBottom:"8px",paddingBottom:"8px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+            {accounts.filter(a=>a.type==="credit").map(a=>(
+              <div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+                <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:"5px"}}>
+                  <span>💳</span><span>{a.name}</span>
+                </div>
+                <div style={{fontSize:"13px",fontWeight:"700",color:"#F87171"}}>
+                  Owed {sym}{a.balance.toFixed(2)}
+                </div>
               </div>
-              <div style={{fontSize:"13px",fontWeight:"700",color:acc.type==="credit"?"#F87171":"#A78BFA"}}>
-                {acc.type==="credit"?`Owed ${sym}${acc.balance.toFixed(2)}`:`${sym}${acc.balance.toFixed(2)}`}
-              </div>
-            </div>
-          );
-        })()}
+            ))}
+            {activeAccount&&accounts.find(a=>a.id===activeAccount&&a.type!=="credit")&&(()=>{
+              const acc=accounts.find(a=>a.id===activeAccount);
+              const icon={savings:"🏦",cash:"💵"}[acc.type]||"🏦";
+              return (
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:"5px"}}>
+                    <span>{icon}</span><span>{acc.name}</span>
+                  </div>
+                  <div style={{fontSize:"13px",fontWeight:"700",color:"#A78BFA"}}>{sym}{acc.balance.toFixed(2)}</div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {expenses.length>0&&(
           <div style={{display:"flex",flexWrap:"wrap",gap:"6px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
             {expenses.map(e=>(
               <div key={e.id} style={{
-                background:e.isIncome?"rgba(52,211,153,0.08)":e.isCreditCard?"rgba(167,139,250,0.07)":"rgba(255,255,255,0.07)",
-                border:`1px solid ${e.isIncome?"rgba(52,211,153,0.2)":e.isCreditCard?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.1)"}`,
-                borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.75)"}}>
+                background:e.isIncome?"rgba(52,211,153,0.1)":e.isCreditCard?"rgba(167,139,250,0.07)":"rgba(248,113,113,0.07)",
+                border:`1px solid ${e.isIncome?"rgba(52,211,153,0.25)":e.isCreditCard?"rgba(167,139,250,0.2)":"rgba(248,113,113,0.2)"}`,
+                borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.85)"}}>
                 {e.isCreditCard&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>💳</span>}
-                {e.account&&!e.isCreditCard&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>{e.account}</span>}
+                {e.isCreditPayoff&&<span style={{fontSize:"10px",color:"#34D399",fontWeight:"600"}}>💳</span>}
+                {e.account&&!e.isCreditCard&&!e.isCreditPayoff&&<span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontWeight:"600"}}>{e.account}</span>}
+                {e.isCreditPayoff&&<span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)"}}>{e.account}</span>}
                 <span>{e.label}</span>
-                <span style={{fontWeight:"700",color:e.isIncome?"#34D399":e.isCreditCard?"#A78BFA":"#fff"}}>{e.isIncome?"+":""}{sym}{e.amount.toFixed(2)}</span>
+                <span style={{fontWeight:"700",color:e.isIncome?"#34D399":e.isCreditCard?"#A78BFA":"#F87171"}}>
+                  {e.isIncome?"+":`-`}{sym}{e.amount.toFixed(2)}
+                </span>
                 <button onClick={()=>{
                   if(e.isIncome){
                     if(e.destination==="main"||!e.destination){
                       setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
+                    } else if(e.isCreditPayoff){
+                      // Reverse credit payoff
+                      if(e.deductBalance!==false){
+                        setSetup(prev=>({...prev,currentBalance:prev.currentBalance+e.amount}));
+                      }
+                      setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:a.balance+e.amount}:a));
                     } else {
-                      setAccounts(prev=>prev.map(a=>{
-                        if(a.id!==e.destination) return a;
-                        return a.type==="credit"?{...a,balance:a.balance+e.amount}:{...a,balance:Math.max(0,a.balance-e.amount)};
-                      }));
+                      setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
                     }
                   } else {
                     // Reverse expense
@@ -1608,7 +1633,7 @@ export default function DayPay() {
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"32px",fontWeight:"700",color:display==="0"?"rgba(255,255,255,0.2)":isIncome?"#34D399":"#fff",letterSpacing:"-0.5px",lineHeight:1}}>
                 {isIncome?"+":""}{sym}{display}
               </div>
-              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");setIsIncome(false);setIncomeDestination("main");}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer",lineHeight:1,flexShrink:0}}>×</button>
+              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");setIsIncome(false);setIncomeDestination("main");setIncomeDeductBalance(true);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer",lineHeight:1,flexShrink:0}}>×</button>
             </div>
           </div>
           {/* Label row */}
@@ -1632,7 +1657,10 @@ export default function DayPay() {
             const destinations = [
               {id:"main", label:"Main Budget", icon:"💰"},
               ...nonCreditAccounts.map(a=>({id:a.id, label:a.name, icon:a.type==="cash"?"💵":"🏦"})),
-              ...creditAccounts.map(a=>({id:a.id, label:`Pay off ${a.name}`, icon:"💳"})),
+              ...creditAccounts.flatMap(a=>[
+                {id:a.id, label:`Pay ${a.name}`, icon:"💳", creditPayoff:true, deductBalance:true},
+                {id:`${a.id}_noDeduct`, label:`Pay ${a.name} (no deduct)`, icon:"💳", creditPayoff:true, deductBalance:false, realAccId:a.id},
+              ]),
             ];
             if(destinations.length<=1) return null;
             return (
@@ -1640,11 +1668,15 @@ export default function DayPay() {
                 <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Add income to</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
                   {destinations.map(d=>(
-                    <button key={d.id} onClick={()=>setIncomeDestination(d.id)} style={{
+                    <button key={d.id} onClick={()=>{
+                    const realId = d.realAccId || d.id;
+                    setIncomeDestination(realId);
+                    setIncomeDeductBalance(d.deductBalance!==false);
+                  }} style={{
                       padding:"6px 12px",borderRadius:"20px",border:"none",
-                      background:incomeDestination===d.id?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",
-                      border:`1px solid ${incomeDestination===d.id?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.08)"}`,
-                      color:incomeDestination===d.id?"#34D399":"rgba(255,255,255,0.45)",
+                      background:(incomeDestination===(d.realAccId||d.id)&&incomeDeductBalance===( d.deductBalance!==false))?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",
+                      border:`1px solid ${(incomeDestination===(d.realAccId||d.id)&&incomeDeductBalance===(d.deductBalance!==false))?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.08)"}`,
+                      color:(incomeDestination===(d.realAccId||d.id)&&incomeDeductBalance===(d.deductBalance!==false))?"#34D399":"rgba(255,255,255,0.45)",
                       fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer",
                       display:"flex",alignItems:"center",gap:"5px"
                     }}>
