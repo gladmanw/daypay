@@ -1142,6 +1142,7 @@ export default function DayPay() {
   const [newTrophy,       setNewTrophy]       = useState(null);
   const [confetti,        setConfetti]        = useState(false);
   const [showCalc,        setShowCalc]        = useState(false);
+  const [isIncome,        setIsIncome]        = useState(false);
   const [showSettings,    setShowSettings]    = useState(false);
   const [showHistory,     setShowHistory]     = useState(false);
   const [showTrophies,    setShowTrophies]    = useState(false);
@@ -1310,12 +1311,17 @@ export default function DayPay() {
     const amt=parseFloat(display);
     if(!amt||amt<=0) return;
     const acc = activeAccount ? accounts.find(a=>a.id===activeAccount) : null;
-    setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
-    // If expense is on a secondary account, deduct from that account's balance
-    if(acc){
-      setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:Math.max(0,a.balance-amt)}:a));
+    if(isIncome){
+      // Add to current balance directly
+      setSetup(prev=>({...prev,currentBalance:prev.currentBalance+amt}));
+      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:acc?.name||null,isIncome:true}]);
+    } else {
+      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
+      if(acc){
+        setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:Math.max(0,a.balance-amt)}:a));
+      }
     }
-    setDisplay("0"); setLabel(""); setShowCalc(false);
+    setDisplay("0"); setLabel(""); setShowCalc(false); setIsIncome(false);
   };
 
   return (
@@ -1454,11 +1460,14 @@ export default function DayPay() {
         {expenses.length>0&&(
           <div style={{display:"flex",flexWrap:"wrap",gap:"6px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
             {expenses.map(e=>(
-              <div key={e.id} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.75)"}}>
+              <div key={e.id} style={{background:e.isIncome?"rgba(52,211,153,0.08)":"rgba(255,255,255,0.07)",border:`1px solid ${e.isIncome?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.1)"}`,borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.75)"}}>
                 {e.account&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>{e.account}</span>}
                 <span>{e.label}</span>
-                <span style={{fontWeight:"700",color:"#fff"}}>{sym}{e.amount.toFixed(2)}</span>
-                <button onClick={()=>setExpenses(p=>p.filter(x=>x.id!==e.id))} style={{background:"none",border:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
+                <span style={{fontWeight:"700",color:e.isIncome?"#34D399":"#fff"}}>{e.isIncome?"+":""}{sym}{e.amount.toFixed(2)}</span>
+                <button onClick={()=>{
+                  if(e.isIncome) setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
+                  setExpenses(p=>p.filter(x=>x.id!==e.id));
+                }} style={{background:"none",border:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
               </div>
             ))}
             <div style={{width:"100%",display:"flex",justifyContent:"flex-end",paddingTop:"4px"}}>
@@ -1473,7 +1482,7 @@ export default function DayPay() {
       {!showCalc&&(
         <>
           <button onClick={()=>setShowCalc(true)} style={{width:"100%",padding:"18px",marginBottom:"16px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"20px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
-            <span style={{fontSize:"20px"}}>+</span> Add Expense
+            <span style={{fontSize:"20px"}}>⊕</span> Add Expense or Income
           </button>
 
           {/* Trophy Cabinet */}
@@ -1538,14 +1547,23 @@ export default function DayPay() {
 
       {/* ── CALCULATOR ── */}
       {showCalc&&(
-        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"20px",padding:"12px",marginBottom:"8px",animation:"slideUp 0.25s ease"}}>
-          {/* Amount display + label on one row */}
+        <div style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${isIncome?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.07)"}`,borderRadius:"20px",padding:"12px",marginBottom:"8px",animation:"slideUp 0.25s ease"}}>
+          {/* Income / Expense toggle */}
+          <div style={{display:"flex",gap:"6px",marginBottom:"8px",background:"rgba(0,0,0,0.2)",borderRadius:"12px",padding:"4px"}}>
+            <button onClick={()=>setIsIncome(false)} style={{flex:1,padding:"8px",borderRadius:"8px",border:"none",background:!isIncome?"rgba(248,113,113,0.2)":"transparent",color:!isIncome?"#F87171":"rgba(255,255,255,0.35)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"13px",cursor:"pointer",transition:"all 0.2s"}}>
+              − Expense
+            </button>
+            <button onClick={()=>setIsIncome(true)} style={{flex:1,padding:"8px",borderRadius:"8px",border:"none",background:isIncome?"rgba(52,211,153,0.2)":"transparent",color:isIncome?"#34D399":"rgba(255,255,255,0.35)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"13px",cursor:"pointer",transition:"all 0.2s"}}>
+              + Income
+            </button>
+          </div>
+          {/* Amount display */}
           <div style={{display:"flex",gap:"8px",marginBottom:"8px",alignItems:"center"}}>
             <div style={{flex:1,background:"rgba(0,0,0,0.3)",borderRadius:"12px",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"32px",fontWeight:"700",color:display==="0"?"rgba(255,255,255,0.2)":"#fff",letterSpacing:"-0.5px",lineHeight:1}}>
-                {sym}{display}
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"32px",fontWeight:"700",color:display==="0"?"rgba(255,255,255,0.2)":isIncome?"#34D399":"#fff",letterSpacing:"-0.5px",lineHeight:1}}>
+                {isIncome?"+":""}{sym}{display}
               </div>
-              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer",lineHeight:1,flexShrink:0}}>×</button>
+              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");setIsIncome(false);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer",lineHeight:1,flexShrink:0}}>×</button>
             </div>
           </div>
           {/* Label + account selector row */}
@@ -1571,8 +1589,13 @@ export default function DayPay() {
               }}>{k}</button>
             ))}
           </div>
-          <button onClick={handleAddExpense} style={{width:"100%",padding:"13px",background:display!=="0"?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:display!=="0"?"1px solid rgba(52,211,153,0.3)":"1px solid rgba(255,255,255,0.07)",borderRadius:"12px",color:display!=="0"?"#34D399":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:display!=="0"?"pointer":"default"}}>
-            {display!=="0"?`+ Add ${sym}${display}`:"+ Add Expense"}
+          <button onClick={handleAddExpense} style={{width:"100%",padding:"13px",
+            background:display!=="0"?(isIncome?"rgba(52,211,153,0.15)":"rgba(248,113,113,0.12)"):"rgba(255,255,255,0.04)",
+            border:display!=="0"?(isIncome?"1px solid rgba(52,211,153,0.3)":"1px solid rgba(248,113,113,0.25)"):"1px solid rgba(255,255,255,0.07)",
+            borderRadius:"12px",
+            color:display!=="0"?(isIncome?"#34D399":"#F87171"):"rgba(255,255,255,0.2)",
+            fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:display!=="0"?"pointer":"default"}}>
+            {display!=="0"?(isIncome?`+ Income ${sym}${display}`:`− ${sym}${display}`):"Enter amount"}
           </button>
         </div>
       )}
