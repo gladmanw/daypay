@@ -1204,7 +1204,7 @@ export default function DayPay() {
     const nextPayday = s.nextPayday || getNextPayday(s.paySchedule, s.customPayDate);
     const days  = daysUntilPayday(nextPayday);
     const daily = days>0 ? s.currentBalance/days : s.currentBalance;
-    const spent = allEx.reduce((t,e)=>t+e.amount,0);
+    const spent = allEx.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((t,e)=>t+e.amount,0);
     const isUnder = spent < daily;
 
     const summary = {date:dateStr, spent, budget:daily, under:isUnder, expenses:allEx};
@@ -1290,9 +1290,10 @@ export default function DayPay() {
   const sym      = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
   const payday   = storedPayday || getNextPayday(paySchedule, customPayDate);
   const days     = daysUntilPayday(payday);
-  const daily    = days>0 ? currentBalance/days : currentBalance;
-  const spent    = expenses.filter(e=>!e.isCreditCard).reduce((s,e)=>s+e.amount,0);
-  const remain   = daily - spent;
+  const daily      = days>0 ? currentBalance/days : currentBalance;
+  const spent      = expenses.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((s,e)=>s+e.amount,0);
+  const todayIncome= expenses.filter(e=>e.isIncome&&e.destination==="main").reduce((s,e)=>s+e.amount,0);
+  const remain     = daily - spent;
   const pct      = Math.min((spent/Math.max(daily,0.01))*100,100);
   const isUnder  = spent < daily;
   const barCol   = pct<60?"#34D399":pct<85?"#FBBF24":"#F87171";
@@ -1447,7 +1448,7 @@ export default function DayPay() {
               {sym}{daily.toFixed(2)}
             </div>
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",marginTop:"4px"}}>
-              {sym}{(currentBalance-spent).toFixed(2)} left · payday {shortDate(payday)}
+              {sym}{(currentBalance-spent).toFixed(2)} left · payday {shortDate(payday)}{todayIncome>0&&<span style={{color:"#34D399",marginLeft:"6px"}}>+{sym}{todayIncome.toFixed(2)} in</span>}
             </div>
           </div>
           <div style={{textAlign:"right"}}>
