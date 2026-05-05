@@ -1142,6 +1142,7 @@ export default function DayPay() {
   const [confetti,        setConfetti]        = useState(false);
   const [showCalc,        setShowCalc]        = useState(false);
   const [isIncome,        setIsIncome]        = useState(false);
+  const [incomeDestination,setIncomeDestination]= useState("main"); // "main" or account id
   const [showSettings,    setShowSettings]    = useState(false);
   const [showHistory,     setShowHistory]     = useState(false);
   const [showTrophies,    setShowTrophies]    = useState(false);
@@ -1310,17 +1311,36 @@ export default function DayPay() {
     const amt=parseFloat(display);
     if(!amt||amt<=0) return;
     const acc = activeAccount ? accounts.find(a=>a.id===activeAccount) : null;
+    const isCredit = acc?.type==="credit";
+
     if(isIncome){
-      // Add to current balance directly
-      setSetup(prev=>({...prev,currentBalance:prev.currentBalance+amt}));
-      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:acc?.name||null,isIncome:true}]);
+      // Income: add to chosen destination
+      if(incomeDestination==="main"){
+        setSetup(prev=>({...prev,currentBalance:prev.currentBalance+amt}));
+      } else {
+        // Add to chosen secondary account (or reduce credit card balance)
+        setAccounts(prev=>prev.map(a=>{
+          if(a.id!==incomeDestination) return a;
+          return a.type==="credit"
+            ? {...a, balance:Math.max(0,a.balance-amt)}  // paying off credit = reduces balance
+            : {...a, balance:a.balance+amt};
+        }));
+      }
+      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:acc?.name||null,isIncome:true,destination:incomeDestination}]);
     } else {
+      // Expense
       setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
       if(acc){
-        setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:Math.max(0,a.balance-amt)}:a));
+        if(isCredit){
+          // Credit card expense INCREASES what you owe
+          setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:a.balance+amt}:a));
+        } else {
+          // Regular account expense deducts
+          setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:Math.max(0,a.balance-amt)}:a));
+        }
       }
     }
-    setDisplay("0"); setLabel(""); setShowCalc(false); setIsIncome(false);
+    setDisplay("0"); setLabel(""); setShowCalc(false); setIsIncome(false); setIncomeDestination("main");
   };
 
   return (
@@ -1450,7 +1470,7 @@ export default function DayPay() {
                 <span>{acc.name}</span>
               </div>
               <div style={{fontSize:"13px",fontWeight:"700",color:acc.type==="credit"?"#F87171":"#A78BFA"}}>
-                {acc.type==="credit"?"-":""}{sym}{acc.balance.toFixed(2)}
+                {acc.type==="credit"?`Owed ${sym}${acc.balance.toFixed(2)}`:`${sym}${acc.balance.toFixed(2)}`}
               </div>
             </div>
           );
@@ -1464,7 +1484,22 @@ export default function DayPay() {
                 <span>{e.label}</span>
                 <span style={{fontWeight:"700",color:e.isIncome?"#34D399":"#fff"}}>{e.isIncome?"+":""}{sym}{e.amount.toFixed(2)}</span>
                 <button onClick={()=>{
-                  if(e.isIncome) setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
+                  if(e.isIncome){
+                    if(e.destination==="main"||!e.destination){
+                      setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
+                    } else {
+                      setAccounts(prev=>prev.map(a=>{
+                        if(a.id!==e.destination) return a;
+                        return a.type==="credit"?{...a,balance:a.balance+e.amount}:{...a,balance:Math.max(0,a.balance-e.amount)};
+                      }));
+                    }
+                  } else {
+                    // Reverse expense: credit card reduces balance, others add back
+                    const acc = accounts.find(a=>a.name===e.account);
+                    if(acc){
+                      setAccounts(prev=>prev.map(a=>a.id===acc.id?(acc.type==="credit"?{...a,balance:Math.max(0,a.balance-e.amount)}:{...a,balance:a.balance+e.amount}):a));
+                    }
+                  }
                   setExpenses(p=>p.filter(x=>x.id!==e.id));
                 }} style={{background:"none",border:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
               </div>
@@ -1562,14 +1597,14 @@ export default function DayPay() {
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"32px",fontWeight:"700",color:display==="0"?"rgba(255,255,255,0.2)":isIncome?"#34D399":"#fff",letterSpacing:"-0.5px",lineHeight:1}}>
                 {isIncome?"+":""}{sym}{display}
               </div>
-              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");setIsIncome(false);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer",lineHeight:1,flexShrink:0}}>×</button>
+              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");setIsIncome(false);setIncomeDestination("main");}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer",lineHeight:1,flexShrink:0}}>×</button>
             </div>
           </div>
-          {/* Label + account selector row */}
+          {/* Label row */}
           <div style={{display:"flex",gap:"6px",marginBottom:"8px"}}>
             <input ref={labelRef} placeholder="Label (optional)" value={label} onChange={e=>setLabel(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAddExpense()}
               style={{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"9px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"13px",outline:"none"}}/>
-            {accounts.length>0&&(
+            {!isIncome&&accounts.length>0&&(
               <select value={activeAccount||""} onChange={e=>setActiveAccount(e.target.value||null)}
                 style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"10px",padding:"9px 10px",color:"rgba(255,255,255,0.7)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",outline:"none",colorScheme:"dark",maxWidth:"110px"}}>
                 <option value="">Main</option>
@@ -1577,6 +1612,38 @@ export default function DayPay() {
               </select>
             )}
           </div>
+          {/* Income destination — only shown when in income mode */}
+          {isIncome&&(()=>{
+            // Non-credit accounts only (can't "receive" money into a credit card, that's a payment)
+            const nonCreditAccounts = accounts.filter(a=>a.type!=="credit");
+            const creditAccounts = accounts.filter(a=>a.type==="credit");
+            // All destinations: main budget + non-credit accounts + credit cards (as "pay off")
+            const destinations = [
+              {id:"main", label:"Main Budget", icon:"💰"},
+              ...nonCreditAccounts.map(a=>({id:a.id, label:a.name, icon:a.type==="cash"?"💵":"🏦"})),
+              ...creditAccounts.map(a=>({id:a.id, label:`Pay off ${a.name}`, icon:"💳"})),
+            ];
+            if(destinations.length<=1) return null;
+            return (
+              <div style={{marginBottom:"8px"}}>
+                <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Add income to</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+                  {destinations.map(d=>(
+                    <button key={d.id} onClick={()=>setIncomeDestination(d.id)} style={{
+                      padding:"6px 12px",borderRadius:"20px",border:"none",
+                      background:incomeDestination===d.id?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",
+                      border:`1px solid ${incomeDestination===d.id?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.08)"}`,
+                      color:incomeDestination===d.id?"#34D399":"rgba(255,255,255,0.45)",
+                      fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer",
+                      display:"flex",alignItems:"center",gap:"5px"
+                    }}>
+                      <span>{d.icon}</span><span>{d.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {/* Compact numpad */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"8px"}}>
             {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(k=>(
