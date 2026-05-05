@@ -1460,7 +1460,7 @@ export default function DayPay() {
       )}
 
       {/* Sheets */}
-      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:currentBalance}} onSave={s=>{
+      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat(Math.max(0,currentBalance-spent-creditPayoffDeductions).toFixed(2))}} onSave={s=>{
         const np = getNextPayday(s.paySchedule, s.customPayDate);
         setSetup(prev=>({...prev,...s,nextPayday:np}));
       }}/>
