@@ -602,10 +602,9 @@ function AccountsSheet({ open, onClose, accounts, onAdd, onDelete, onUpdate, sym
   if (!open) return null;
 
   const TYPES = [
-    { id:"savings",     label:"Savings",     icon:"🏦" },
-    { id:"credit",      label:"Credit Card", icon:"💳" },
-    { id:"current",     label:"Current",     icon:"🏧" },
-    { id:"investment",  label:"Investment",  icon:"📈" },
+    { id:"savings",     label:"Bank Account", icon:"🏦" },
+    { id:"credit",      label:"Credit Card",  icon:"💳" },
+    { id:"cash",        label:"Cash",         icon:"💵" },
   ];
 
   const handleAdd = () => {
@@ -632,7 +631,7 @@ function AccountsSheet({ open, onClose, accounts, onAdd, onDelete, onUpdate, sym
           {/* Add account */}
           <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"18px",padding:"16px",marginBottom:"20px"}}>
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Add Account</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"6px",marginBottom:"10px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"10px"}}>
               {TYPES.map(t=>(
                 <button key={t.id} onClick={()=>setType(t.id)} style={{padding:"10px 4px",borderRadius:"10px",border:`1px solid ${type===t.id?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.07)"}`,background:type===t.id?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",color:type===t.id?"#A78BFA":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"11px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
                   <span>{t.icon}</span><span style={{fontWeight:"600"}}>{t.label}</span>
