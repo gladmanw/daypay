@@ -642,7 +642,7 @@ function AccountsSheet({ open, onClose, accounts, onAdd, onDelete, onUpdate, sym
               style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 14px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",marginBottom:"10px",boxSizing:"border-box"}}/>
             <div style={{position:"relative",marginBottom:"10px"}}>
               <span style={{position:"absolute",left:"12px",top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,0.3)",fontSize:"15px"}}>{sym}</span>
-              <input type="number" placeholder={type==="credit"?"Credit limit or balance owed":"Current balance"} value={balance} onChange={e=>setBalance(e.target.value)}
+              <input type="number" placeholder={type==="credit"?"Balance owed":"Current balance"} value={balance} onChange={e=>setBalance(e.target.value)}
                 style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 12px 12px 28px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",boxSizing:"border-box"}}/>
             </div>
             <button onClick={handleAdd} disabled={!name.trim()} style={{
