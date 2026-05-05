@@ -1053,23 +1053,21 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
           </div>
         </div>
       </div>
-    </div>
-
-    {/* FAQ Sheet */}
-    {showFaq&&(
-      <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",overflowY:"auto",zIndex:10,animation:"sheetUp 0.3s ease"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
-          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
-        </div>
-        <div style={{padding:"0 24px 48px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>How Day Pay Works</div>
-            <button onClick={()=>setShowFaq(false)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"10px",padding:"8px 12px",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:"14px"}}>← Back</button>
+      {showFaq&&(
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",overflowY:"auto",zIndex:10,animation:"sheetUp 0.3s ease"}}>
+          <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
+            <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
           </div>
-          <FaqList/>
+          <div style={{padding:"0 24px 48px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>How Day Pay Works</div>
+              <button onClick={()=>setShowFaq(false)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"10px",padding:"8px 12px",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:"14px"}}>Back</button>
+            </div>
+            <FaqList/>
+          </div>
         </div>
-      </div>
-    )}
+      )}
+    </div>
   );
 }
 
