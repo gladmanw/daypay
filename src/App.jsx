@@ -1291,13 +1291,16 @@ export default function DayPay() {
   const sym      = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
   const payday   = storedPayday || getNextPayday(paySchedule, customPayDate);
   const days     = daysUntilPayday(payday);
-  const daily      = days>0 ? currentBalance/days : currentBalance;
-  const spent        = expenses.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((s,e)=>s+e.amount,0);
-  const creditPayoffs= expenses.filter(e=>e.isCreditPayoff).reduce((s,e)=>s+e.amount,0);
-  const todayIncome= expenses.filter(e=>e.isIncome&&e.destination==="main").reduce((s,e)=>s+e.amount,0);
-  const remain     = daily - spent;
-  const pct      = Math.min((spent/Math.max(daily,0.01))*100,100);
-  const isUnder  = spent < daily;
+  const daily           = days>0 ? currentBalance/days : currentBalance;
+  // Regular expenses (not credit card charges, not income entries)
+  const spent           = expenses.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((s,e)=>s+e.amount,0);
+  // Credit payoffs that deduct from balance count against "remaining" too
+  const creditPayoffDeductions = expenses.filter(e=>e.isCreditPayoff&&e.deductBalance!==false).reduce((s,e)=>s+e.amount,0);
+  const todayIncome     = expenses.filter(e=>e.isIncome&&e.destination==="main").reduce((s,e)=>s+e.amount,0);
+  const effectiveSpent  = spent + creditPayoffDeductions;
+  const remain          = daily - effectiveSpent;
+  const pct      = Math.min((effectiveSpent/Math.max(daily,0.01))*100,100);
+  const isUnder  = effectiveSpent < daily;
   const barCol   = pct<60?"#34D399":pct<85?"#FBBF24":"#F87171";
   const streak   = (()=>{ let s=0; for(let i=history.length-1;i>=0;i--){if(history[i].under)s++;else break;} return s; })();
   const totalWins= history.filter(h=>h.under).length;
@@ -1495,57 +1498,73 @@ export default function DayPay() {
           </div>
         )}
 
-        {expenses.length>0&&(
-          <div style={{display:"flex",flexWrap:"wrap",gap:"6px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-            {expenses.map(e=>(
-              <div key={e.id} style={{
-                background:e.isIncome?"rgba(52,211,153,0.1)":e.isCreditCard?"rgba(167,139,250,0.07)":"rgba(248,113,113,0.07)",
-                border:`1px solid ${e.isIncome?"rgba(52,211,153,0.25)":e.isCreditCard?"rgba(167,139,250,0.2)":"rgba(248,113,113,0.2)"}`,
-                borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.85)"}}>
-                {e.isCreditCard&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>💳</span>}
-                {e.isCreditPayoff&&<span style={{fontSize:"10px",color:"#34D399",fontWeight:"600"}}>💳</span>}
-                {e.account&&!e.isCreditCard&&!e.isCreditPayoff&&<span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontWeight:"600"}}>{e.account}</span>}
-                {e.isCreditPayoff&&<span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)"}}>{e.account}</span>}
-                <span>{e.label}</span>
-                <span style={{fontWeight:"700",color:e.isIncome?"#34D399":e.isCreditCard?"#A78BFA":"#F87171"}}>
-                  {e.isIncome?"+":`-`}{sym}{e.amount.toFixed(2)}
-                </span>
-                <button onClick={()=>{
-                  if(e.isIncome){
-                    if(e.destination==="main"||!e.destination){
-                      setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
-                    } else if(e.isCreditPayoff){
-                      // Reverse credit payoff
-                      if(e.deductBalance!==false){
-                        setSetup(prev=>({...prev,currentBalance:prev.currentBalance+e.amount}));
-                      }
-                      setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:a.balance+e.amount}:a));
-                    } else {
-                      setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
-                    }
-                  } else {
-                    // Reverse expense
-                    const acc = accounts.find(a=>a.name===e.account);
-                    if(acc){
-                      if(e.isCreditCard){
-                        // Reverse credit card charge — reduce balance owed
-                        setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
-                      } else {
-                        // Reverse regular expense — add back to account balance
-                        setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:a.balance+e.amount}:a));
-                      }
-                    }
-                  }
-                  setExpenses(p=>p.filter(x=>x.id!==e.id));
-                }} style={{background:"none",border:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
-              </div>
-            ))}
-            <div style={{width:"100%",display:"flex",justifyContent:"flex-end",paddingTop:"4px"}}>
-              <span style={{fontSize:"12px",color:"rgba(255,255,255,0.35)"}}>Total: </span>
-              <span style={{fontSize:"12px",color:"#fff",fontWeight:"700",marginLeft:"4px"}}>{sym}{spent.toFixed(2)}</span>
+        {expenses.length>0&&(()=>{
+          // Group expenses into sections
+          const mainExpenses   = expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&!e.account);
+          const accountExpenses= expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&e.account);
+          const creditCharges  = expenses.filter(e=>e.isCreditCard);
+          const incomeItems    = expenses.filter(e=>e.isIncome);
+
+          const deletePill = (e) => {
+            if(e.isIncome){
+              if(e.destination==="main"||!e.destination){
+                setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
+              } else if(e.isCreditPayoff){
+                if(e.deductBalance!==false) setSetup(prev=>({...prev,currentBalance:prev.currentBalance+e.amount}));
+                setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:a.balance+e.amount}:a));
+              } else {
+                setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
+              }
+            } else {
+              const acc=accounts.find(a=>a.name===e.account);
+              if(acc){
+                if(e.isCreditCard) setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
+                else setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:a.balance+e.amount}:a));
+              }
+            }
+            setExpenses(p=>p.filter(x=>x.id!==e.id));
+          };
+
+          const Pill = ({e}) => (
+            <div style={{
+              display:"flex",alignItems:"center",gap:"6px",
+              padding:"5px 10px 5px 8px",borderRadius:"50px",fontSize:"12px",
+              background:e.isIncome?"rgba(52,211,153,0.1)":e.isCreditCard?"rgba(167,139,250,0.07)":"rgba(248,113,113,0.07)",
+              border:`1px solid ${e.isIncome?"rgba(52,211,153,0.25)":e.isCreditCard?"rgba(167,139,250,0.2)":"rgba(248,113,113,0.2)"}`,
+              color:"rgba(255,255,255,0.85)"
+            }}>
+              <span>{e.label}</span>
+              <span style={{fontWeight:"700",color:e.isIncome?"#34D399":e.isCreditCard?"#A78BFA":"#F87171"}}>
+                {e.isIncome?"+":`-`}{sym}{e.amount.toFixed(2)}
+              </span>
+              <button onClick={()=>deletePill(e)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
             </div>
-          </div>
-        )}
+          );
+
+          const Section = ({label, icon, items, color}) => items.length===0?null:(
+            <div style={{marginBottom:"8px"}}>
+              <div style={{fontSize:"10px",color:color||"rgba(255,255,255,0.3)",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:"5px",display:"flex",alignItems:"center",gap:"4px"}}>
+                <span>{icon}</span><span>{label}</span>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"5px"}}>
+                {items.map(e=><Pill key={e.id} e={e}/>)}
+              </div>
+            </div>
+          );
+
+          return (
+            <div style={{paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+              <Section label="Expenses"      icon="−" items={mainExpenses}    color="rgba(248,113,113,0.6)"/>
+              <Section label="Other Accounts" icon="🏦" items={accountExpenses} color="rgba(167,139,250,0.6)"/>
+              <Section label="Credit Card"   icon="💳" items={creditCharges}  color="rgba(167,139,250,0.6)"/>
+              <Section label="Income"        icon="+" items={incomeItems}     color="rgba(52,211,153,0.7)"/>
+              <div style={{display:"flex",justifyContent:"space-between",paddingTop:"4px",marginTop:"2px",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                <span style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>Spent today</span>
+                <span style={{fontSize:"12px",color:"#F87171",fontWeight:"700"}}>{sym}{effectiveSpent.toFixed(2)}</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── ADD EXPENSE BUTTON + TROPHY CABINET ── */}
