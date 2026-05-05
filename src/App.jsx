@@ -1460,7 +1460,7 @@ export default function DayPay() {
       )}
 
       {/* Sheets */}
-      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat(Math.max(0,remain).toFixed(2))}} onSave={s=>{
+      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat(Math.max(0,currentBalance-spent).toFixed(2))}} onSave={s=>{
         const np = getNextPayday(s.paySchedule, s.customPayDate);
         // Reverse-engineer the true base currentBalance so the front screen shows
         // exactly what the user typed, with all existing transactions intact.
@@ -1535,7 +1535,7 @@ export default function DayPay() {
               {sym}{daily.toFixed(2)}
             </div>
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",marginTop:"4px"}}>
-              {sym}{remain>=0?remain.toFixed(2):"0.00"} left · payday {shortDate(payday)}{todayIncome>0&&<span style={{color:"#34D399",marginLeft:"6px"}}>+{sym}{todayIncome.toFixed(2)} in</span>}
+              {sym}{Math.max(0,currentBalance-spent).toFixed(2)} left · payday {shortDate(payday)}{todayIncome>0&&<span style={{color:"#34D399",marginLeft:"6px"}}>+{sym}{todayIncome.toFixed(2)} in</span>}
             </div>
 
           </div>
