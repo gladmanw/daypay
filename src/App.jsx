@@ -1341,7 +1341,7 @@ export default function DayPay() {
   const billsReservedPerDay = 0; // bills now deduct on the day, not spread
   const daily           = days>0 ? currentBalance/days : currentBalance;
   // Regular expenses (not credit card charges, not income entries)
-  const spent           = expenses.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((s,e)=>s+e.amount,0);
+  const spent           = expenses.filter(e=>!e.isCreditCard&&!e.isIncome&&!e.isAutoBalancer).reduce((s,e)=>s+e.amount,0);
   // Credit payoffs that deduct from balance count against "remaining" too
   const creditPayoffDeductions = expenses.filter(e=>e.isCreditPayoff&&e.deductBalance!==false).reduce((s,e)=>s+e.amount,0);
   const todayIncome     = expenses.filter(e=>e.isIncome&&e.destination==="main").reduce((s,e)=>s+e.amount,0);
@@ -1460,7 +1460,7 @@ export default function DayPay() {
       )}
 
       {/* Sheets */}
-      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat((currentBalance-spent).toFixed(2))}} onSave={s=>{
+      <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat(Math.max(0,remain).toFixed(2))}} onSave={s=>{
         const np = getNextPayday(s.paySchedule, s.customPayDate);
         // Reverse-engineer the true base currentBalance so the front screen shows
         // exactly what the user typed, with all existing transactions intact.
@@ -1535,7 +1535,7 @@ export default function DayPay() {
               {sym}{daily.toFixed(2)}
             </div>
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",marginTop:"4px"}}>
-              {sym}{(currentBalance-spent).toFixed(2)} left · payday {shortDate(payday)}{todayIncome>0&&<span style={{color:"#34D399",marginLeft:"6px"}}>+{sym}{todayIncome.toFixed(2)} in</span>}
+              {sym}{remain>=0?remain.toFixed(2):"0.00"} left · payday {shortDate(payday)}{todayIncome>0&&<span style={{color:"#34D399",marginLeft:"6px"}}>+{sym}{todayIncome.toFixed(2)} in</span>}
             </div>
 
           </div>
