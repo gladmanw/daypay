@@ -1144,6 +1144,7 @@ export default function DayPay() {
   const [isIncome,        setIsIncome]        = useState(false);
   const [incomeDestination,setIncomeDestination]= useState("main"); // "main" or account id
   const [incomeDeductBalance,setIncomeDeductBalance]= useState(true);
+  const [showTransactions,setShowTransactions]= useState(false);
   const [showSettings,    setShowSettings]    = useState(false);
   const [showHistory,     setShowHistory]     = useState(false);
   const [showTrophies,    setShowTrophies]    = useState(false);
@@ -1328,6 +1329,8 @@ export default function DayPay() {
         if(incomeDeductBalance){
           // Pay card AND deduct from main balance
           setSetup(prev=>({...prev,currentBalance:prev.currentBalance-amt}));
+          // Auto balancing expense so remain updates correctly
+          setExpenses(prev=>[...prev,{id:Date.now()+1,label:'Pay '+destAcc.name,amount:amt,account:null,isAutoBalancer:true,linkedCreditCard:destAcc.name}]);
         }
         // Always reduce card balance owed
         setAccounts(prev=>prev.map(a=>a.id===incomeDestination?{...a,balance:Math.max(0,a.balance-amt)}:a));
@@ -1498,15 +1501,30 @@ export default function DayPay() {
           </div>
         )}
 
-        {expenses.length>0&&(()=>{
-          // Group expenses into sections
-          const mainExpenses   = expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&!e.account);
+        {expenses.length>0&&(
+          <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',marginTop:'4px',paddingTop:'8px'}}>
+            <button onClick={()=>setShowTransactions(v=>!v)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',background:'none',border:'none',cursor:'pointer',paddingBottom:'4px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',letterSpacing:'1.5px',textTransform:'uppercase'}}>Transactions</span>
+                <span style={{background:'rgba(255,255,255,0.08)',borderRadius:'20px',padding:'2px 8px',fontSize:'11px',color:'rgba(255,255,255,0.45)',fontWeight:'600'}}>{expenses.filter(e=>!e.isAutoBalancer).length}</span>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <span style={{fontSize:'12px',color:'#F87171',fontWeight:'700'}}>-{sym}{effectiveSpent.toFixed(2)}</span>
+                <span style={{color:'rgba(255,255,255,0.3)',fontSize:'13px',display:'inline-block',transform:showTransactions?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>{showTransactions ? '-' : '+'}</span>
+              </div>
+            </button>
+          </div>
+        )}
+        {expenses.length>0&&showTransactions&&(()=>{
+          const mainExpenses   = expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&!e.account&&!e.isAutoBalancer);
           const accountExpenses= expenses.filter(e=>!e.isIncome&&!e.isCreditCard&&e.account);
           const creditCharges  = expenses.filter(e=>e.isCreditCard);
           const incomeItems    = expenses.filter(e=>e.isIncome);
 
           const deletePill = (e) => {
-            if(e.isIncome){
+            if(e.isAutoBalancer){
+              setSetup(prev=>({...prev,currentBalance:prev.currentBalance+e.amount}));
+            } else if(e.isIncome){
               if(e.destination==="main"||!e.destination){
                 setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
               } else if(e.isCreditPayoff){
@@ -1558,10 +1576,7 @@ export default function DayPay() {
               <Section label="Other Accounts" icon="🏦" items={accountExpenses} color="rgba(167,139,250,0.6)"/>
               <Section label="Credit Card"   icon="💳" items={creditCharges}  color="rgba(167,139,250,0.6)"/>
               <Section label="Income"        icon="+" items={incomeItems}     color="rgba(52,211,153,0.7)"/>
-              <div style={{display:"flex",justifyContent:"space-between",paddingTop:"4px",marginTop:"2px",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-                <span style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>Spent today</span>
-                <span style={{fontSize:"12px",color:"#F87171",fontWeight:"700"}}>{sym}{effectiveSpent.toFixed(2)}</span>
-              </div>
+
             </div>
           );
         })()}
