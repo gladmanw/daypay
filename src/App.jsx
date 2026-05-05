@@ -481,6 +481,222 @@ function PaydayModal({ sym, suggestedBalance, onConfirm }) {
   );
 }
 
+
+// ─── Recurring Bills Sheet ────────────────────────────────────────────────────
+const BILL_FREQUENCIES = [
+  { id:"daily",   label:"Daily" },
+  { id:"weekly",  label:"Weekly" },
+  { id:"monthly", label:"Monthly" },
+];
+
+function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym }) {
+  const [translateY, setTranslateY] = React.useState(0);
+  const startY = React.useRef(null);
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
+  const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
+
+  const [name,  setName]  = useState("");
+  const [amount,setAmount]= useState("");
+  const [freq,  setFreq]  = useState("monthly");
+  const [day,   setDay]   = useState("1");
+
+  if (!open) return null;
+
+  const handleAdd = () => {
+    const amt = parseFloat(amount);
+    if (!name.trim() || !amt || amt <= 0) return;
+    onAdd({ id: `bill_${Date.now()}`, name: name.trim(), amount: amt, frequency: freq, dayOfMonth: parseInt(day)||1 });
+    setName(""); setAmount(""); setFreq("monthly"); setDay("1");
+  };
+
+  const monthlyTotal = bills.reduce((s,b) => {
+    if(b.frequency==="daily")   return s + b.amount * 30;
+    if(b.frequency==="weekly")  return s + b.amount * 4.33;
+    return s + b.amount;
+  }, 0);
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
+      <div
+        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"88vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      >
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
+        </div>
+        <div style={{padding:"0 24px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>Recurring Bills</div>
+            {monthlyTotal>0&&<div style={{fontSize:"12px",color:"#F87171"}}>{sym}{monthlyTotal.toFixed(2)}/mo</div>}
+          </div>
+
+          {/* Add new bill */}
+          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"18px",padding:"16px",marginBottom:"20px"}}>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Add Bill</div>
+            <input placeholder="Bill name (e.g. Netflix)" value={name} onChange={e=>setName(e.target.value)}
+              style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 14px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",marginBottom:"10px",boxSizing:"border-box"}}/>
+            <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
+              <div style={{position:"relative",flex:1}}>
+                <span style={{position:"absolute",left:"12px",top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,0.3)",fontSize:"15px"}}>{sym}</span>
+                <input type="number" placeholder="0.00" value={amount} onChange={e=>setAmount(e.target.value)}
+                  style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 12px 12px 28px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <select value={freq} onChange={e=>setFreq(e.target.value)}
+                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"13px",outline:"none",colorScheme:"dark"}}>
+                {BILL_FREQUENCIES.map(f=><option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </div>
+            {freq==="monthly"&&(
+              <div style={{marginBottom:"10px"}}>
+                <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"6px"}}>Day of month</div>
+                <input type="number" min="1" max="31" value={day} onChange={e=>setDay(e.target.value)}
+                  style={{width:"80px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"10px",padding:"10px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none"}}/>
+              </div>
+            )}
+            <button onClick={handleAdd} disabled={!name.trim()||!parseFloat(amount)} style={{
+              width:"100%",padding:"13px",
+              background:name.trim()&&parseFloat(amount)?"rgba(248,113,113,0.15)":"rgba(255,255,255,0.04)",
+              border:name.trim()&&parseFloat(amount)?"1px solid rgba(248,113,113,0.3)":"1px solid rgba(255,255,255,0.07)",
+              borderRadius:"12px",color:name.trim()&&parseFloat(amount)?"#F87171":"rgba(255,255,255,0.2)",
+              fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"14px",cursor:"pointer"
+            }}>+ Add Bill</button>
+          </div>
+
+          {/* Bill list */}
+          {bills.length===0 ? (
+            <div style={{textAlign:"center",padding:"24px 0",color:"rgba(255,255,255,0.25)",fontSize:"13px"}}>No recurring bills yet</div>
+          ) : bills.map(b=>(
+            <div key={b.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+              <div>
+                <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{b.name}</div>
+                <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>
+                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:""}
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                <div style={{fontSize:"13px",color:"#F87171",fontWeight:"600"}}>{sym}{b.amount.toFixed(2)}</div>
+                <button onClick={()=>onDelete(b.id)} style={{background:"rgba(248,113,113,0.12)",border:"none",borderRadius:"8px",width:"28px",height:"28px",color:"#F87171",cursor:"pointer",fontSize:"15px",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Secondary Accounts Sheet ─────────────────────────────────────────────────
+function AccountsSheet({ open, onClose, accounts, onAdd, onDelete, onUpdate, sym, activeAccount, onSetActive }) {
+  const [translateY, setTranslateY] = React.useState(0);
+  const startY = React.useRef(null);
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
+  const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
+
+  const [name,    setName]    = useState("");
+  const [balance, setBalance] = useState("");
+  const [type,    setType]    = useState("savings");
+
+  if (!open) return null;
+
+  const TYPES = [
+    { id:"savings",     label:"Savings",     icon:"🏦" },
+    { id:"credit",      label:"Credit Card", icon:"💳" },
+    { id:"current",     label:"Current",     icon:"🏧" },
+    { id:"investment",  label:"Investment",  icon:"📈" },
+  ];
+
+  const handleAdd = () => {
+    const bal = parseFloat(balance);
+    if (!name.trim()) return;
+    onAdd({ id:`acc_${Date.now()}`, name:name.trim(), balance:bal||0, type });
+    setName(""); setBalance(""); setType("savings");
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
+      <div
+        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"88vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      >
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
+        </div>
+        <div style={{padding:"0 24px"}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"6px"}}>Accounts</div>
+          <div style={{fontSize:"13px",color:"rgba(255,255,255,0.35)",marginBottom:"20px"}}>Track savings, credit cards and other accounts alongside your main budget.</div>
+
+          {/* Add account */}
+          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"18px",padding:"16px",marginBottom:"20px"}}>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Add Account</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"6px",marginBottom:"10px"}}>
+              {TYPES.map(t=>(
+                <button key={t.id} onClick={()=>setType(t.id)} style={{padding:"10px 4px",borderRadius:"10px",border:`1px solid ${type===t.id?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.07)"}`,background:type===t.id?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",color:type===t.id?"#A78BFA":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"11px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
+                  <span>{t.icon}</span><span style={{fontWeight:"600"}}>{t.label}</span>
+                </button>
+              ))}
+            </div>
+            <input placeholder="Account name" value={name} onChange={e=>setName(e.target.value)}
+              style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 14px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",marginBottom:"10px",boxSizing:"border-box"}}/>
+            <div style={{position:"relative",marginBottom:"10px"}}>
+              <span style={{position:"absolute",left:"12px",top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,0.3)",fontSize:"15px"}}>{sym}</span>
+              <input type="number" placeholder={type==="credit"?"Credit limit or balance owed":"Current balance"} value={balance} onChange={e=>setBalance(e.target.value)}
+                style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 12px 12px 28px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <button onClick={handleAdd} disabled={!name.trim()} style={{
+              width:"100%",padding:"13px",
+              background:name.trim()?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",
+              border:name.trim()?"1px solid rgba(167,139,250,0.3)":"1px solid rgba(255,255,255,0.07)",
+              borderRadius:"12px",color:name.trim()?"#A78BFA":"rgba(255,255,255,0.2)",
+              fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"14px",cursor:"pointer"
+            }}>+ Add Account</button>
+          </div>
+
+          {/* Account list */}
+          {accounts.length===0 ? (
+            <div style={{textAlign:"center",padding:"24px 0",color:"rgba(255,255,255,0.25)",fontSize:"13px"}}>No accounts added yet</div>
+          ) : accounts.map(acc=>{
+            const typeInfo = TYPES.find(t=>t.id===acc.type)||TYPES[0];
+            const isActive = activeAccount===acc.id;
+            const isCredit = acc.type==="credit";
+            return (
+              <div key={acc.id} style={{background:isActive?"rgba(167,139,250,0.08)":"rgba(255,255,255,0.02)",border:`1px solid ${isActive?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.06)"}`,borderRadius:"16px",padding:"14px 16px",marginBottom:"10px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                    <span style={{fontSize:"22px"}}>{typeInfo.icon}</span>
+                    <div>
+                      <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{acc.name}</div>
+                      <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",marginTop:"1px"}}>{typeInfo.label}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:"18px",fontWeight:"700",color:isCredit?"#F87171":"#34D399",fontFamily:"'Cormorant Garamond',serif"}}>{isCredit?"-":""}{sym}{acc.balance.toFixed(2)}</div>
+                    <div style={{display:"flex",gap:"6px",marginTop:"6px",justifyContent:"flex-end"}}>
+                      <button onClick={()=>onSetActive(isActive?null:acc.id)} style={{background:isActive?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.06)",border:`1px solid ${isActive?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:"8px",padding:"4px 10px",color:isActive?"#A78BFA":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"11px",cursor:"pointer",fontWeight:"600"}}>
+                        {isActive?"Active":"Set Active"}
+                      </button>
+                      <button onClick={()=>onDelete(acc.id)} style={{background:"rgba(248,113,113,0.1)",border:"none",borderRadius:"8px",width:"26px",height:"26px",color:"#F87171",cursor:"pointer",fontSize:"14px",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                    </div>
+                  </div>
+                </div>
+                {/* Inline balance update */}
+                <div style={{marginTop:"10px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.05)",display:"flex",gap:"8px",alignItems:"center"}}>
+                  <input type="number" placeholder="Update balance" onBlur={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))onUpdate(acc.id,v);e.target.value="";}}
+                    style={{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"13px",outline:"none"}}/>
+                  <span style={{fontSize:"12px",color:"rgba(255,255,255,0.3)"}}>Update</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── History Sheet ────────────────────────────────────────────────────────────
 function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
   const [translateY, setTranslateY] = React.useState(0);
@@ -935,12 +1151,17 @@ export default function DayPay() {
   const [showBudgetTip,   setShowBudgetTip]   = useState(false);
   const [customTrophies,  setCustomTrophies]  = useState(saved?.customTrophies  ?? []);
   const [showCreateTrophy,setShowCreateTrophy]= useState(false);
+  const [bills,           setBills]           = useState(saved?.bills           ?? []);
+  const [accounts,        setAccounts]        = useState(saved?.accounts        ?? []);
+  const [activeAccount,   setActiveAccount]   = useState(saved?.activeAccount   ?? null);
+  const [showBills,       setShowBills]       = useState(false);
+  const [showAccounts,    setShowAccounts]    = useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,unlocked,allTimeTrophies,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,customTrophies});
-  },[setup,expenses,history,unlocked,allTimeTrophies,daySummary,paydayModal,lastClosedDate]);
+    saveAll({setup,expenses,history,unlocked,allTimeTrophies,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,customTrophies,bills,accounts,activeAccount});
+  },[setup,expenses,history,unlocked,allTimeTrophies,daySummary,paydayModal,lastClosedDate,customTrophies,bills,accounts,activeAccount]);
 
   // On app open — check if day has changed
   useEffect(()=>{
@@ -969,13 +1190,23 @@ export default function DayPay() {
     if(!stored?.setup) return;
     const s = stored.setup;
     const ex = stored.expenses ?? [];
+    const storedBills = stored.bills ?? [];
+    const today2 = new Date(); today2.setHours(0,0,0,0);
+    // Auto-add due recurring bills as expenses
+    const dueBills = storedBills.filter(b => {
+      if(b.frequency==="daily") return true;
+      if(b.frequency==="weekly") return today2.getDay()===5; // every Friday
+      if(b.frequency==="monthly") return today2.getDate()===b.dayOfMonth;
+      return false;
+    }).map(b => ({id:`bill_auto_${b.id}_${Date.now()}`, label:`${b.name} (auto)`, amount:b.amount, auto:true}));
+    const allEx = [...ex, ...dueBills];
     const nextPayday = s.nextPayday || getNextPayday(s.paySchedule, s.customPayDate);
     const days  = daysUntilPayday(nextPayday);
     const daily = days>0 ? s.currentBalance/days : s.currentBalance;
-    const spent = ex.reduce((t,e)=>t+e.amount,0);
+    const spent = allEx.reduce((t,e)=>t+e.amount,0);
     const isUnder = spent < daily;
 
-    const summary = {date:dateStr, spent, budget:daily, under:isUnder, expenses:ex};
+    const summary = {date:dateStr, spent, budget:daily, under:isUnder, expenses:allEx};
 
     // Update history
     setHistory(prev=>[...prev,summary]);
@@ -1078,7 +1309,12 @@ export default function DayPay() {
   const handleAddExpense = () => {
     const amt=parseFloat(display);
     if(!amt||amt<=0) return;
-    setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt}]);
+    const acc = activeAccount ? accounts.find(a=>a.id===activeAccount) : null;
+    setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
+    // If expense is on a secondary account, deduct from that account's balance
+    if(acc){
+      setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:Math.max(0,a.balance-amt)}:a));
+    }
     setDisplay("0"); setLabel(""); setShowCalc(false);
   };
 
@@ -1130,6 +1366,16 @@ export default function DayPay() {
         setSetup(prev=>({...prev,...s,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
+      <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym}
+        onAdd={b=>setBills(prev=>[...prev,b])}
+        onDelete={id=>setBills(prev=>prev.filter(b=>b.id!==id))}
+      />
+      <AccountsSheet open={showAccounts} onClose={()=>setShowAccounts(false)} accounts={accounts} sym={sym} activeAccount={activeAccount}
+        onAdd={a=>setAccounts(prev=>[...prev,a])}
+        onDelete={id=>{ setAccounts(prev=>prev.filter(a=>a.id!==id)); if(activeAccount===id)setActiveAccount(null); }}
+        onUpdate={(id,bal)=>setAccounts(prev=>prev.map(a=>a.id===id?{...a,balance:bal}:a))}
+        onSetActive={id=>setActiveAccount(id)}
+      />
       <TrophiesSheet open={showTrophies} onClose={()=>setShowTrophies(false)} unlocked={unlocked} allTimeTrophies={allTimeTrophies} customTrophies={customTrophies} onCreateTrophy={()=>setShowCreateTrophy(true)} onDeleteCustom={id=>setCustomTrophies(prev=>prev.filter(t=>t.id!==id))}/>
 
       {/* ── TOP BAR ── */}
@@ -1139,6 +1385,8 @@ export default function DayPay() {
           {streak>0&&<div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"50px",padding:"4px 10px",fontSize:"12px",color:"#FBBF24"}}>🔥{streak}</div>}
           <button onClick={()=>setShowTrophies(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>🏆</button>
           <button onClick={()=>setShowHistory(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>📊</button>
+          <button onClick={()=>setShowAccounts(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>🏦</button>
+          <button onClick={()=>setShowBills(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>🔄</button>
           <button onClick={()=>setShowSettings(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>⚙️</button>
         </div>
       </div>
@@ -1173,7 +1421,7 @@ export default function DayPay() {
               {sym}{daily.toFixed(2)}
             </div>
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",marginTop:"4px"}}>
-              {sym}{currentBalance.toFixed(2)} ÷ {days}d · payday {shortDate(payday)}
+              {sym}{(currentBalance-spent).toFixed(2)} left · payday {shortDate(payday)}
             </div>
           </div>
           <div style={{textAlign:"right"}}>
@@ -1185,10 +1433,28 @@ export default function DayPay() {
           </div>
         </div>
 
+        {/* Active secondary account indicator */}
+        {activeAccount && accounts.find(a=>a.id===activeAccount) && (()=>{
+          const acc = accounts.find(a=>a.id===activeAccount);
+          const typeIcons = {savings:"🏦",credit:"💳",current:"🏧",investment:"📈"};
+          return (
+            <div style={{marginBottom:"8px",paddingBottom:"8px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:"6px"}}>
+                <span>{typeIcons[acc.type]||"🏦"}</span>
+                <span>{acc.name}</span>
+              </div>
+              <div style={{fontSize:"13px",fontWeight:"700",color:acc.type==="credit"?"#F87171":"#A78BFA"}}>
+                {acc.type==="credit"?"-":""}{sym}{acc.balance.toFixed(2)}
+              </div>
+            </div>
+          );
+        })()}
+
         {expenses.length>0&&(
           <div style={{display:"flex",flexWrap:"wrap",gap:"6px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
             {expenses.map(e=>(
               <div key={e.id} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.75)"}}>
+                {e.account&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>{e.account}</span>}
                 <span>{e.label}</span>
                 <span style={{fontWeight:"700",color:"#fff"}}>{sym}{e.amount.toFixed(2)}</span>
                 <button onClick={()=>setExpenses(p=>p.filter(x=>x.id!==e.id))} style={{background:"none",border:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",padding:"0",fontSize:"13px",lineHeight:1}}>×</button>
@@ -1281,7 +1547,19 @@ export default function DayPay() {
               {sym}{display}
             </div>
           </div>
-          <input ref={labelRef} placeholder="What was it? (optional)" value={label} onChange={e=>setLabel(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAddExpense()} style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"12px",padding:"11px 14px",color:"#fff",marginBottom:"12px",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none"}}/>
+          <input ref={labelRef} placeholder="What was it? (optional)" value={label} onChange={e=>setLabel(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAddExpense()} style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"12px",padding:"11px 14px",color:"#fff",marginBottom:"10px",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none"}}/>
+          {accounts.length>0&&(
+            <div style={{display:"flex",gap:"6px",marginBottom:"10px",overflowX:"auto",paddingBottom:"2px"}}>
+              <button onClick={()=>setActiveAccount(null)} style={{flexShrink:0,padding:"6px 12px",borderRadius:"20px",border:`1px solid ${!activeAccount?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.08)"}`,background:!activeAccount?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",color:!activeAccount?"#34D399":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
+                Main
+              </button>
+              {accounts.map(a=>(
+                <button key={a.id} onClick={()=>setActiveAccount(activeAccount===a.id?null:a.id)} style={{flexShrink:0,padding:"6px 12px",borderRadius:"20px",border:`1px solid ${activeAccount===a.id?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.08)"}`,background:activeAccount===a.id?"rgba(167,139,250,0.12)":"rgba(255,255,255,0.04)",color:activeAccount===a.id?"#A78BFA":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
+                  {a.name}
+                </button>
+              ))}
+            </div>
+          )}
           <NumPad onKey={handleNumKey}/>
           <button onClick={handleAddExpense} style={{width:"100%",marginTop:"12px",padding:"15px",background:display!=="0"?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:display!=="0"?"1px solid rgba(52,211,153,0.3)":"1px solid rgba(255,255,255,0.07)",borderRadius:"14px",color:display!=="0"?"#34D399":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:display!=="0"?"pointer":"default"}}>
             {display!=="0"?`+ Add ${sym}${display}`:"+ Add Expense"}
