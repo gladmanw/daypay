@@ -1319,7 +1319,7 @@ export default function DayPay() {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 20% 10%,#0e1a10 0%,#080f12 55%,#0a0a18 100%)",fontFamily:"'DM Sans',sans-serif",color:"#fff",display:"flex",flexDirection:"column",maxWidth:"420px",margin:"0 auto",padding:"20px 20px 32px",position:"relative"}}>
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 20% 10%,#0e1a10 0%,#080f12 55%,#0a0a18 100%)",fontFamily:"'DM Sans',sans-serif",color:"#fff",display:"flex",flexDirection:"column",maxWidth:"420px",margin:"0 auto",padding:"20px 20px 16px",position:"relative"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
         @keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
@@ -1379,15 +1379,16 @@ export default function DayPay() {
       <TrophiesSheet open={showTrophies} onClose={()=>setShowTrophies(false)} unlocked={unlocked} allTimeTrophies={allTimeTrophies} customTrophies={customTrophies} onCreateTrophy={()=>setShowCreateTrophy(true)} onDeleteCustom={id=>setCustomTrophies(prev=>prev.filter(t=>t.id!==id))}/>
 
       {/* ── TOP BAR ── */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
-        <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",letterSpacing:"-0.3px"}}>Day Pay</div>
-        <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-          {streak>0&&<div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"50px",padding:"4px 10px",fontSize:"12px",color:"#FBBF24"}}>🔥{streak}</div>}
-          <button onClick={()=>setShowTrophies(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>🏆</button>
-          <button onClick={()=>setShowHistory(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>📊</button>
-          <button onClick={()=>setShowAccounts(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>🏦</button>
-          <button onClick={()=>setShowBills(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>🔄</button>
-          <button onClick={()=>setShowSettings(true)} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 10px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>⚙️</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"16px"}}>
+        <div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",letterSpacing:"-0.3px",lineHeight:1}}>Day Pay</div>
+          <div style={{fontSize:"10px",color:"rgba(255,255,255,0.28)",marginTop:"4px",letterSpacing:"0.2px",lineHeight:1.4,maxWidth:"200px"}}>Budgeting that makes every day, Pay Day</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"2px"}}>
+          {streak>0&&<div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"50px",padding:"4px 10px",fontSize:"12px",color:"#FBBF24"}}>🔥 {streak}</div>}
+          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>
+            {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
+          </div>
         </div>
       </div>
 
@@ -1567,12 +1568,35 @@ export default function DayPay() {
         </div>
       )}
 
-      {/* ── FOOTER ── */}
-      <div style={{textAlign:"center",marginTop:"8px"}}>
-        <div style={{fontSize:"12px",color:"rgba(255,255,255,0.18)"}}>
-          {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})} · Day closes at midnight
-        </div>
+      {/* ── BOTTOM NAV ── */}
+      <div style={{
+        position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
+        width:"100%",maxWidth:"420px",
+        background:"rgba(8,15,18,0.95)",
+        backdropFilter:"blur(20px)",
+        borderTop:"1px solid rgba(255,255,255,0.07)",
+        display:"flex",justifyContent:"space-around",alignItems:"center",
+        padding:"10px 0 24px",zIndex:100
+      }}>
+        {[
+          {icon:"📊", label:"History",  action:()=>setShowHistory(true)},
+          {icon:"🏦", label:"Accounts", action:()=>setShowAccounts(true)},
+          {icon:"🔄", label:"Bills",    action:()=>setShowBills(true)},
+          {icon:"🏆", label:"Trophies", action:()=>setShowTrophies(true)},
+          {icon:"⚙️", label:"Settings", action:()=>setShowSettings(true)},
+        ].map(item=>(
+          <button key={item.label} onClick={item.action} style={{
+            background:"none",border:"none",cursor:"pointer",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",
+            padding:"6px 12px",borderRadius:"12px",
+            transition:"all 0.15s"
+          }}>
+            <span style={{fontSize:"20px"}}>{item.icon}</span>
+            <span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontWeight:"500",letterSpacing:"0.3px"}}>{item.label}</span>
+          </button>
+        ))}
       </div>
+      <div style={{height:"80px"}}/>
     </div>
   );
 }
