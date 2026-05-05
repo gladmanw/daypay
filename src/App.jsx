@@ -1175,6 +1175,7 @@ export default function DayPay() {
   const [paydayModal,     setPaydayModal]     = useState(saved?.pendingPayday   ?? null);
   const [lastClosedDate,  setLastClosedDate]  = useState(saved?.lastClosedDate  ?? todayISO());
   const [showBudgetTip,   setShowBudgetTip]   = useState(false);
+  const [lockedDailyBudget,setLockedDailyBudget]= useState(saved?.lockedDailyBudget ?? null);
   const [customTrophies,  setCustomTrophies]  = useState(saved?.customTrophies  ?? []);
   const [showCreateTrophy,setShowCreateTrophy]= useState(false);
   const [bills,           setBills]           = useState(saved?.bills           ?? []);
@@ -1186,7 +1187,7 @@ export default function DayPay() {
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,unlocked,allTimeTrophies,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,customTrophies,bills,accounts,activeAccount});
+    saveAll({setup,expenses,history,unlocked,allTimeTrophies,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,customTrophies,bills,accounts,activeAccount,lockedDailyBudget});
   },[setup,expenses,history,unlocked,allTimeTrophies,daySummary,paydayModal,lastClosedDate,customTrophies,bills,accounts,activeAccount]);
 
   // On app open — check if day has changed
@@ -1197,6 +1198,21 @@ export default function DayPay() {
       runDayClose(lastClosedDate);
     }
   },[]);
+
+  // Lock the daily budget at the start of each day
+  useEffect(()=>{
+    if(!setup) return;
+    const stored = loadAll();
+    // If no locked budget yet, or it was set on a different day, recalculate and lock
+    if(!stored?.lockedDailyBudget || stored?.lockedBudgetDate !== todayISO()){
+      const d = daysUntilPayday(setup.nextPayday || getNextPayday(setup.paySchedule, setup.customPayDate));
+      const newLocked = d>0 ? setup.currentBalance/d : setup.currentBalance;
+      setLockedDailyBudget(newLocked);
+      // Save the date it was locked
+      const all = loadAll()||{};
+      saveAll({...all, lockedDailyBudget:newLocked, lockedBudgetDate:todayISO()});
+    }
+  },[setup?.currentBalance]);
 
   // Check every minute for midnight rollover
   useEffect(()=>{
@@ -1257,6 +1273,8 @@ export default function DayPay() {
     setDisplay("0");
     setLastClosedDate(todayISO());
     setDaySummary(summary);
+    // Clear locked budget so it recalculates fresh tomorrow
+    setLockedDailyBudget(null);
 
     // Check if today is payday
     const todayStr = todayISO();
@@ -1339,7 +1357,8 @@ export default function DayPay() {
   const payday   = storedPayday || getNextPayday(paySchedule, customPayDate);
   const days     = daysUntilPayday(payday);
   const billsReservedPerDay = 0; // bills now deduct on the day, not spread
-  const daily           = days>0 ? currentBalance/days : currentBalance;
+  // Use locked daily budget (set at start of day) — only changes with income or settings update
+  const daily           = lockedDailyBudget ?? (days>0 ? currentBalance/days : currentBalance);
   // Regular expenses (not credit card charges, not income entries)
   const spent           = expenses.filter(e=>!e.isCreditCard&&!e.isIncome&&!e.isAutoBalancer).reduce((s,e)=>s+e.amount,0);
   // Credit payoffs that deduct from balance count against "remaining" too
@@ -1385,6 +1404,11 @@ export default function DayPay() {
       const destAcc = accounts.find(a=>a.id===incomeDestination);
       if(incomeDestination==="main"){
         setSetup(prev=>({...prev,currentBalance:prev.currentBalance+amt}));
+        // Income to main updates the locked daily budget too
+        setLockedDailyBudget(prev=>{
+          const newBalance = (setup.currentBalance||0) + amt;
+          return days>0 ? newBalance/days : newBalance;
+        });
       } else if(destAcc?.type==="credit"){
         if(incomeDeductBalance){
           // Pay card AND deduct from main balance
@@ -1477,6 +1501,11 @@ export default function DayPay() {
         // So to make front screen show newBalance: currentBalance = newBalance + spent
         const newDisplayBalance = s.currentBalance;
         const trueBase = parseFloat((newDisplayBalance + spent).toFixed(2));
+        // Recalculate and lock the new daily budget based on what user typed
+        const newLocked = parseFloat((newDisplayBalance / Math.max(days,1)).toFixed(2));
+        setLockedDailyBudget(newLocked);
+        const all = loadAll()||{};
+        saveAll({...all, lockedDailyBudget:newLocked, lockedBudgetDate:todayISO()});
         setSetup(prev=>({...prev,...s,currentBalance:trueBase,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
