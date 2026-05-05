@@ -1291,7 +1291,7 @@ export default function DayPay() {
   const payday   = storedPayday || getNextPayday(paySchedule, customPayDate);
   const days     = daysUntilPayday(payday);
   const daily    = days>0 ? currentBalance/days : currentBalance;
-  const spent    = expenses.reduce((s,e)=>s+e.amount,0);
+  const spent    = expenses.filter(e=>!e.isCreditCard).reduce((s,e)=>s+e.amount,0);
   const remain   = daily - spent;
   const pct      = Math.min((spent/Math.max(daily,0.01))*100,100);
   const isUnder  = spent < daily;
@@ -1328,14 +1328,14 @@ export default function DayPay() {
       }
       setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:acc?.name||null,isIncome:true,destination:incomeDestination}]);
     } else {
-      // Expense
-      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
-      if(acc){
-        if(isCredit){
-          // Credit card expense INCREASES what you owe
-          setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:a.balance+amt}:a));
-        } else {
-          // Regular account expense deducts
+      if(isCredit){
+        // Credit card expense: ONLY increases balance owed on the card — does NOT affect daily budget
+        setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:a.balance+amt}:a));
+        setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null,isCreditCard:true}]);
+      } else {
+        // Regular expense: deducts from daily budget as normal
+        setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
+        if(acc){
           setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:Math.max(0,a.balance-amt)}:a));
         }
       }
@@ -1479,10 +1479,14 @@ export default function DayPay() {
         {expenses.length>0&&(
           <div style={{display:"flex",flexWrap:"wrap",gap:"6px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
             {expenses.map(e=>(
-              <div key={e.id} style={{background:e.isIncome?"rgba(52,211,153,0.08)":"rgba(255,255,255,0.07)",border:`1px solid ${e.isIncome?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.1)"}`,borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.75)"}}>
-                {e.account&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>{e.account}</span>}
+              <div key={e.id} style={{
+                background:e.isIncome?"rgba(52,211,153,0.08)":e.isCreditCard?"rgba(167,139,250,0.07)":"rgba(255,255,255,0.07)",
+                border:`1px solid ${e.isIncome?"rgba(52,211,153,0.2)":e.isCreditCard?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.1)"}`,
+                borderRadius:"50px",padding:"4px 10px",display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"rgba(255,255,255,0.75)"}}>
+                {e.isCreditCard&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>💳</span>}
+                {e.account&&!e.isCreditCard&&<span style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600"}}>{e.account}</span>}
                 <span>{e.label}</span>
-                <span style={{fontWeight:"700",color:e.isIncome?"#34D399":"#fff"}}>{e.isIncome?"+":""}{sym}{e.amount.toFixed(2)}</span>
+                <span style={{fontWeight:"700",color:e.isIncome?"#34D399":e.isCreditCard?"#A78BFA":"#fff"}}>{e.isIncome?"+":""}{sym}{e.amount.toFixed(2)}</span>
                 <button onClick={()=>{
                   if(e.isIncome){
                     if(e.destination==="main"||!e.destination){
@@ -1494,10 +1498,16 @@ export default function DayPay() {
                       }));
                     }
                   } else {
-                    // Reverse expense: credit card reduces balance, others add back
+                    // Reverse expense
                     const acc = accounts.find(a=>a.name===e.account);
                     if(acc){
-                      setAccounts(prev=>prev.map(a=>a.id===acc.id?(acc.type==="credit"?{...a,balance:Math.max(0,a.balance-e.amount)}:{...a,balance:a.balance+e.amount}):a));
+                      if(e.isCreditCard){
+                        // Reverse credit card charge — reduce balance owed
+                        setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
+                      } else {
+                        // Reverse regular expense — add back to account balance
+                        setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:a.balance+e.amount}:a));
+                      }
                     }
                   }
                   setExpenses(p=>p.filter(x=>x.id!==e.id));
