@@ -991,6 +991,76 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
             {daily>0&&<div style={{fontSize:"12px",color:"#34D399",marginTop:"6px",fontWeight:"600"}}>{sym}{daily.toFixed(2)} / day</div>}
           </div>
 
+
+          {/* ── FAQ ── */}
+          <div style={{marginTop:"28px",paddingTop:"24px",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>FAQ</div>
+            {[
+              {
+                q:"How is my daily budget calculated?",
+                a:"Your daily budget is set at the start of each day by dividing your current balance by the number of days until payday. It's locked for the entire day so you always have a consistent target to aim for."
+              },
+              {
+                q:"Does adding expenses change my daily budget?",
+                a:"No — expenses only affect What's Left for today. Your daily budget number stays fixed all day so you can clearly see how much you're allowed to spend regardless of what you've already logged."
+              },
+              {
+                q:"What happens when I add income to my main account?",
+                a:"Income is added to your current balance immediately and affects What's Left today. It doesn't change today's daily budget — but tomorrow when the day resets, the new daily budget will be calculated from your updated balance including the income."
+              },
+              {
+                q:"What is 'What's Left'?",
+                a:"What's Left is your daily budget minus today's expenses. It shows how much of today's allowance you still have. It goes down as you spend and is separate from your current balance."
+              },
+              {
+                q:"What's the difference between Current Balance and What's Left?",
+                a:"Current Balance is the total money in your main account — it's a running total that updates with income and is cleared of expenses at midnight. What's Left is just today's remaining daily allowance."
+              },
+              {
+                q:"How do credit card expenses work?",
+                a:"Credit card expenses are tracked separately and don't affect your daily budget or current balance — because the money hasn't actually left your account yet. Your Amex (or any card) shows an 'Owed' balance so you always know what you'll need to pay off."
+              },
+              {
+                q:"How do I pay off my credit card?",
+                a:"Use the Income mode and select 'Pay [card name]' as the destination. This reduces what you owe on the card and deducts from your current balance. If the payment has already left your account (e.g. direct debit), use 'Pay [card name] (no deduct)' to just update the balance owed without touching your current balance."
+              },
+              {
+                q:"What are recurring bills?",
+                a:"Bills are regular payments like Netflix or rent. Add them in the Bills section and they'll automatically create an expense and deduct from your account on their due date. The Bills icon shows a red badge counting how many bills are coming up this month."
+              },
+              {
+                q:"When does my day reset?",
+                a:"At midnight your day closes automatically. Your current balance is updated, a summary of the day appears when you next open the app, and a fresh daily budget is calculated for the new day."
+              },
+              {
+                q:"How do I update my current balance?",
+                a:"Go to Settings and update the Current Balance field. When you save, the app works backwards so that the number you type is exactly what shows on the main screen — your existing today's transactions stay intact."
+              },
+              {
+                q:"How do trophies work?",
+                a:"Trophies are earned by hitting spending goals — like staying under budget for several days in a row or spending less than 50% of your daily budget. They reset each pay period but your all-time count is saved. You can also create custom trophies with your own rules."
+              },
+            ].map((item,i)=>{
+              const [open, setOpen] = React.useState(false);
+              return (
+                <div key={i} style={{marginBottom:"8px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"14px",overflow:"hidden"}}>
+                  <button onClick={()=>setOpen(v=>!v)} style={{
+                    width:"100%",padding:"14px 16px",background:"none",border:"none",
+                    display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"
+                  }}>
+                    <span style={{fontSize:"13px",color:"#fff",fontWeight:"600",textAlign:"left",flex:1,paddingRight:"12px"}}>{item.q}</span>
+                    <span style={{color:"rgba(255,255,255,0.3)",fontSize:"16px",flexShrink:0,transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s"}}>+</span>
+                  </button>
+                  {open&&(
+                    <div style={{padding:"0 16px 14px",fontSize:"13px",color:"rgba(255,255,255,0.55)",lineHeight:1.7}}>
+                      {item.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
           <button onClick={()=>{
             const bal=parseFloat(balance)||0;
             const sal=parseFloat(salary)||0;
@@ -999,6 +1069,18 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
           }} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"16px",cursor:"pointer",boxShadow:"0 6px 24px rgba(167,139,250,0.3)"}}>
             Save Changes
           </button>
+
+          <div style={{textAlign:"center",marginTop:"24px",paddingTop:"20px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.2)",lineHeight:1.8}}>
+              Created by
+            </div>
+            <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)",fontWeight:"600"}}>
+              Wayne Gladman
+            </div>
+            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.2)"}}>
+              London, United Kingdom 🇬🇧
+            </div>
+          </div>
         </div>
       </div>
     </div>
