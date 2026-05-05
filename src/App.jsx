@@ -251,7 +251,7 @@ function CreateTrophyModal({ open, onClose, onSave, sym }) {
           {/* Step 0 — Pick icon */}
           {step===0&&(
             <div style={{animation:"slideUp 0.3s ease"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>Pick an icon</div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"12px"}}>Pick an icon</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:"8px",marginBottom:"24px",maxHeight:"240px",overflowY:"auto"}}>
                 {TROPHY_EMOJIS.map(e=>(
                   <button key={e} onClick={()=>setIcon(e)} style={{
@@ -1393,7 +1393,7 @@ export default function DayPay() {
       </div>
 
       {/* ── BUDGET CARD ── */}
-      <div style={{background:"linear-gradient(135deg,rgba(52,211,153,0.08),rgba(255,255,255,0.02))",border:"1px solid rgba(52,211,153,0.15)",borderRadius:"24px",padding:"20px",marginBottom:"12px",position:"relative",overflow:"hidden"}}>
+      <div style={{background:"linear-gradient(135deg,rgba(52,211,153,0.08),rgba(255,255,255,0.02))",border:"1px solid rgba(52,211,153,0.15)",borderRadius:"24px",padding:"16px",marginBottom:"10px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:0,left:0,right:0,height:"3px"}}>
           <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${barCol}88,${barCol})`,transition:"width 0.4s ease"}}/>
         </div>
@@ -1538,31 +1538,40 @@ export default function DayPay() {
 
       {/* ── CALCULATOR ── */}
       {showCalc&&(
-        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"20px",padding:"16px",marginBottom:"12px",animation:"slideUp 0.25s ease"}}>
-          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:"14px",padding:"14px 18px",marginBottom:"12px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
-              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase"}}>Amount</div>
-              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"18px",cursor:"pointer",lineHeight:1}}>×</button>
-            </div>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"40px",fontWeight:"700",color:display==="0"?"rgba(255,255,255,0.2)":"#fff",letterSpacing:"-1px",lineHeight:1,textAlign:"right"}}>
-              {sym}{display}
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"20px",padding:"12px",marginBottom:"8px",animation:"slideUp 0.25s ease"}}>
+          {/* Amount display + label on one row */}
+          <div style={{display:"flex",gap:"8px",marginBottom:"8px",alignItems:"center"}}>
+            <div style={{flex:1,background:"rgba(0,0,0,0.3)",borderRadius:"12px",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"32px",fontWeight:"700",color:display==="0"?"rgba(255,255,255,0.2)":"#fff",letterSpacing:"-0.5px",lineHeight:1}}>
+                {sym}{display}
+              </div>
+              <button onClick={()=>{setShowCalc(false);setDisplay("0");setLabel("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer",lineHeight:1,flexShrink:0}}>×</button>
             </div>
           </div>
-          <input ref={labelRef} placeholder="What was it? (optional)" value={label} onChange={e=>setLabel(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAddExpense()} style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"12px",padding:"11px 14px",color:"#fff",marginBottom:"10px",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none"}}/>
-          {accounts.length>0&&(
-            <div style={{display:"flex",gap:"6px",marginBottom:"10px",overflowX:"auto",paddingBottom:"2px"}}>
-              <button onClick={()=>setActiveAccount(null)} style={{flexShrink:0,padding:"6px 12px",borderRadius:"20px",border:`1px solid ${!activeAccount?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.08)"}`,background:!activeAccount?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",color:!activeAccount?"#34D399":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
-                Main
-              </button>
-              {accounts.map(a=>(
-                <button key={a.id} onClick={()=>setActiveAccount(activeAccount===a.id?null:a.id)} style={{flexShrink:0,padding:"6px 12px",borderRadius:"20px",border:`1px solid ${activeAccount===a.id?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.08)"}`,background:activeAccount===a.id?"rgba(167,139,250,0.12)":"rgba(255,255,255,0.04)",color:activeAccount===a.id?"#A78BFA":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
-                  {a.name}
-                </button>
-              ))}
-            </div>
-          )}
-          <NumPad onKey={handleNumKey}/>
-          <button onClick={handleAddExpense} style={{width:"100%",marginTop:"12px",padding:"15px",background:display!=="0"?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:display!=="0"?"1px solid rgba(52,211,153,0.3)":"1px solid rgba(255,255,255,0.07)",borderRadius:"14px",color:display!=="0"?"#34D399":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:display!=="0"?"pointer":"default"}}>
+          {/* Label + account selector row */}
+          <div style={{display:"flex",gap:"6px",marginBottom:"8px"}}>
+            <input ref={labelRef} placeholder="Label (optional)" value={label} onChange={e=>setLabel(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAddExpense()}
+              style={{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"9px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"13px",outline:"none"}}/>
+            {accounts.length>0&&(
+              <select value={activeAccount||""} onChange={e=>setActiveAccount(e.target.value||null)}
+                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"10px",padding:"9px 10px",color:"rgba(255,255,255,0.7)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",outline:"none",colorScheme:"dark",maxWidth:"110px"}}>
+                <option value="">Main</option>
+                {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            )}
+          </div>
+          {/* Compact numpad */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"8px"}}>
+            {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(k=>(
+              <button key={k} onClick={()=>handleNumKey(k)} style={{
+                padding:"14px 0",borderRadius:"12px",border:"none",
+                background:k==="⌫"?"rgba(248,113,113,0.1)":"rgba(255,255,255,0.06)",
+                color:k==="⌫"?"#F87171":"rgba(255,255,255,0.85)",
+                fontSize:"19px",fontWeight:"600",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"
+              }}>{k}</button>
+            ))}
+          </div>
+          <button onClick={handleAddExpense} style={{width:"100%",padding:"13px",background:display!=="0"?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:display!=="0"?"1px solid rgba(52,211,153,0.3)":"1px solid rgba(255,255,255,0.07)",borderRadius:"12px",color:display!=="0"?"#34D399":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:display!=="0"?"pointer":"default"}}>
             {display!=="0"?`+ Add ${sym}${display}`:"+ Add Expense"}
           </button>
         </div>
