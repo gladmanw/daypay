@@ -489,25 +489,26 @@ const BILL_FREQUENCIES = [
   { id:"monthly", label:"Monthly" },
 ];
 
-function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym }) {
+function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }) {
   const [translateY, setTranslateY] = React.useState(0);
   const startY = React.useRef(null);
   const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
   const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
   const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
 
-  const [name,  setName]  = useState("");
-  const [amount,setAmount]= useState("");
-  const [freq,  setFreq]  = useState("monthly");
-  const [day,   setDay]   = useState("1");
+  const [name,     setName]     = useState("");
+  const [amount,   setAmount]   = useState("");
+  const [freq,     setFreq]     = useState("monthly");
+  const [day,      setDay]      = useState("1");
+  const [billAccId,setBillAccId]= useState("main");
 
   if (!open) return null;
 
   const handleAdd = () => {
     const amt = parseFloat(amount);
     if (!name.trim() || !amt || amt <= 0) return;
-    onAdd({ id: `bill_${Date.now()}`, name: name.trim(), amount: amt, frequency: freq, dayOfMonth: parseInt(day)||1 });
-    setName(""); setAmount(""); setFreq("monthly"); setDay("1");
+    onAdd({ id: `bill_${Date.now()}`, name: name.trim(), amount: amt, frequency: freq, dayOfMonth: parseInt(day)||1, accountId: billAccId });
+    setName(""); setAmount(""); setFreq("monthly"); setDay("1"); setBillAccId("main");
   };
 
   const monthlyTotal = bills.reduce((s,b) => {
@@ -527,9 +528,15 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym }) {
           <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
         </div>
         <div style={{padding:"0 24px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
             <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>Recurring Bills</div>
             {monthlyTotal>0&&<div style={{fontSize:"12px",color:"#F87171"}}>{sym}{monthlyTotal.toFixed(2)}/mo</div>}
+          </div>
+          <div style={{background:"rgba(251,191,36,0.07)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"14px",padding:"12px 14px",marginBottom:"20px",display:"flex",gap:"10px",alignItems:"flex-start"}}>
+            <span style={{fontSize:"16px",flexShrink:0}}>💡</span>
+            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.55)",lineHeight:1.65}}>
+              Bills are <span style={{color:"#FBBF24",fontWeight:"600"}}>deducted in full on their due date</span> — your balance, daily budget, and what's left will all update automatically on the day the bill hits.
+            </div>
           </div>
 
           {/* Add new bill */}
@@ -555,6 +562,22 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym }) {
                   style={{width:"80px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"10px",padding:"10px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none"}}/>
               </div>
             )}
+            {/* Account selector */}
+            {accounts&&accounts.length>0&&(
+              <div style={{marginBottom:"10px"}}>
+                <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"6px"}}>Deduct from</div>
+                <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                  <button onClick={()=>setBillAccId("main")} style={{padding:"7px 14px",borderRadius:"20px",border:"none",background:billAccId==="main"?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",border:`1px solid ${billAccId==="main"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,color:billAccId==="main"?"#34D399":"rgba(255,255,255,0.45)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
+                    Main Account
+                  </button>
+                  {accounts.map(a=>(
+                    <button key={a.id} onClick={()=>setBillAccId(a.id)} style={{padding:"7px 14px",borderRadius:"20px",border:"none",background:billAccId===a.id?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.05)",border:`1px solid ${billAccId===a.id?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.08)"}`,color:billAccId===a.id?"#A78BFA":"rgba(255,255,255,0.45)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button onClick={handleAdd} disabled={!name.trim()||!parseFloat(amount)} style={{
               width:"100%",padding:"13px",
               background:name.trim()&&parseFloat(amount)?"rgba(248,113,113,0.15)":"rgba(255,255,255,0.04)",
@@ -572,7 +595,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym }) {
               <div>
                 <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{b.name}</div>
                 <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>
-                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:""}
+                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:""} · {b.accountId==="main"||!b.accountId?"Main Account":(accounts?.find(a=>a.id===b.accountId)?.name||"Main Account")}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
@@ -1195,13 +1218,28 @@ export default function DayPay() {
     const ex = stored.expenses ?? [];
     const storedBills = stored.bills ?? [];
     const today2 = new Date(); today2.setHours(0,0,0,0);
-    // Auto-add due recurring bills as expenses
+    // Bills due TODAY: deduct from balance (they actually hit the account)
+    // Daily/weekly bills always hit; monthly only on their due day
     const dueBills = storedBills.filter(b => {
       if(b.frequency==="daily") return true;
       if(b.frequency==="weekly") return today2.getDay()===5; // every Friday
       if(b.frequency==="monthly") return today2.getDate()===b.dayOfMonth;
       return false;
-    }).map(b => ({id:`bill_auto_${b.id}_${Date.now()}`, label:`${b.name} (auto)`, amount:b.amount, auto:true}));
+    }).map(b => ({
+      id:`bill_auto_${b.id}_${Date.now()}`,
+      label:b.name,
+      amount:b.amount,
+      auto:true,
+      isBillDeduction:true,
+      accountId: b.accountId||"main"
+    }));
+    // Deduct due bills from the correct account balance
+    const storedAccounts = stored.accounts ?? [];
+    dueBills.forEach(b => {
+      if(b.accountId && b.accountId!=="main"){
+        // Deduct from secondary account — will be handled via setAccounts below
+      }
+    });
     const allEx = [...ex, ...dueBills];
     const nextPayday = s.nextPayday || getNextPayday(s.paySchedule, s.customPayDate);
     const days  = daysUntilPayday(nextPayday);
@@ -1233,6 +1271,14 @@ export default function DayPay() {
       setUnlocked([]);
     } else {
       setSetup(prev=>({...prev,currentBalance:newBalance}));
+      // Deduct any bills assigned to secondary accounts
+      const billsOnAccounts = dueBills.filter(b=>b.accountId&&b.accountId!=="main");
+      if(billsOnAccounts.length>0){
+        setAccounts(prev=>prev.map(acc=>{
+          const totalForAcc = billsOnAccounts.filter(b=>b.accountId===acc.id).reduce((s,b)=>s+b.amount,0);
+          return totalForAcc>0 ? {...acc, balance:Math.max(0,acc.balance-totalForAcc)} : acc;
+        }));
+      }
     }
 
     // Trophy check
@@ -1292,6 +1338,7 @@ export default function DayPay() {
   const sym      = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
   const payday   = storedPayday || getNextPayday(paySchedule, customPayDate);
   const days     = daysUntilPayday(payday);
+  const billsReservedPerDay = 0; // bills now deduct on the day, not spread
   const daily           = days>0 ? currentBalance/days : currentBalance;
   // Regular expenses (not credit card charges, not income entries)
   const spent           = expenses.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((s,e)=>s+e.amount,0);
@@ -1304,6 +1351,19 @@ export default function DayPay() {
   const isUnder  = effectiveSpent < daily;
   const barCol   = pct<60?"#34D399":pct<85?"#FBBF24":"#F87171";
   const streak   = (()=>{ let s=0; for(let i=history.length-1;i>=0;i--){if(history[i].under)s++;else break;} return s; })();
+
+  // Count bills due this month that haven't passed yet
+  const upcomingBillsCount = bills.filter(b => {
+    const today4 = new Date(); today4.setHours(0,0,0,0);
+    if(b.frequency==="daily") return true;
+    if(b.frequency==="weekly") return true;
+    if(b.frequency==="monthly"){
+      const dueDay = b.dayOfMonth || 1;
+      const dueDate = new Date(today4.getFullYear(), today4.getMonth(), dueDay);
+      return dueDate >= today4; // due today or in the future this month
+    }
+    return false;
+  }).length;
   const totalWins= history.filter(h=>h.under).length;
 
   const handleNumKey = (key) => {
@@ -1405,7 +1465,7 @@ export default function DayPay() {
         setSetup(prev=>({...prev,...s,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
-      <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym}
+      <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym} accounts={accounts}
         onAdd={b=>setBills(prev=>[...prev,b])}
         onDelete={id=>setBills(prev=>prev.filter(b=>b.id!==id))}
       />
@@ -1463,6 +1523,7 @@ export default function DayPay() {
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",marginTop:"4px"}}>
               {sym}{(currentBalance-spent).toFixed(2)} left · payday {shortDate(payday)}{todayIncome>0&&<span style={{color:"#34D399",marginLeft:"6px"}}>+{sym}{todayIncome.toFixed(2)} in</span>}
             </div>
+
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:"3px"}}>{isUnder?"Left":"Over"}</div>
@@ -1760,7 +1821,7 @@ export default function DayPay() {
         {[
           {icon:"📊", label:"History",  action:()=>setShowHistory(true)},
           {icon:"🏦", label:"Accounts", action:()=>setShowAccounts(true)},
-          {icon:"🔄", label:"Bills",    action:()=>setShowBills(true)},
+          {icon:"🔄", label:"Bills",    action:()=>setShowBills(true), badge:upcomingBillsCount},
           {icon:"🏆", label:"Trophies", action:()=>setShowTrophies(true)},
           {icon:"⚙️", label:"Settings", action:()=>setShowSettings(true)},
         ].map(item=>(
@@ -1768,9 +1829,20 @@ export default function DayPay() {
             background:"none",border:"none",cursor:"pointer",
             display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",
             padding:"6px 12px",borderRadius:"12px",
-            transition:"all 0.15s"
+            transition:"all 0.15s",position:"relative"
           }}>
-            <span style={{fontSize:"20px"}}>{item.icon}</span>
+            <span style={{fontSize:"20px",position:"relative"}}>
+              {item.icon}
+              {item.badge>0&&(
+                <span style={{
+                  position:"absolute",top:"-4px",right:"-6px",
+                  background:"#F87171",borderRadius:"50%",
+                  width:"16px",height:"16px",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:"9px",fontWeight:"700",color:"#fff",lineHeight:1
+                }}>{item.badge}</span>
+              )}
+            </span>
             <span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontWeight:"500",letterSpacing:"0.3px"}}>{item.label}</span>
           </button>
         ))}
