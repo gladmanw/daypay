@@ -1472,10 +1472,11 @@ export default function DayPay() {
         // Credit payoffs with deductBalance=true DO reduce currentBalance so included.
         // Secondary account expenses don't touch currentBalance so excluded.
         // Income to main adds to currentBalance so subtracted back.
+        // User typed what they want to see on the front screen.
+        // Front screen shows: currentBalance - spent
+        // So to make front screen show newBalance: currentBalance = newBalance + spent
         const newDisplayBalance = s.currentBalance;
-        const trueBase = parseFloat((
-          newDisplayBalance + spent + creditPayoffDeductions - todayIncome
-        ).toFixed(2));
+        const trueBase = parseFloat((newDisplayBalance + spent).toFixed(2));
         setSetup(prev=>({...prev,...s,currentBalance:trueBase,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
