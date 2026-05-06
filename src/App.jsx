@@ -1024,7 +1024,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
               <span style={{position:"absolute",left:"16px",top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,0.3)",fontSize:"18px"}}>{sym}</span>
               <input type="number" value={salary} onChange={e=>setSalary(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"14px",padding:"14px 16px 14px 40px",color:"#fff",fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"600",outline:"none",boxSizing:"border-box"}}/>
             </div>
-            {daily>0&&<div style={{fontSize:"12px",color:"#34D399",marginTop:"6px",fontWeight:"600"}}>{sym}{daily.toFixed(2)} / day</div>}
+
           </div>
 
 
