@@ -1028,10 +1028,6 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
           </div>
 
 
-          <button onClick={()=>setShowFaq(true)} style={{width:"100%",padding:"14px",marginBottom:"10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"16px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
-            <span>❓</span> How does Day Pay work?
-          </button>
-
           <button onClick={()=>{
             const bal=parseFloat(balance)||0;
             const sal=parseFloat(salary)||0;
@@ -1039,6 +1035,10 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
             onClose();
           }} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"16px",cursor:"pointer",boxShadow:"0 6px 24px rgba(167,139,250,0.3)"}}>
             Save Changes
+          </button>
+
+          <button onClick={()=>setShowFaq(true)} style={{width:"100%",padding:"14px",marginTop:"10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"16px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+            <span>❓</span> FAQ
           </button>
 
           <div style={{textAlign:"center",marginTop:"24px",paddingTop:"20px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
