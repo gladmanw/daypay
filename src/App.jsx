@@ -16,13 +16,15 @@ const CURRENCIES = [
   { code:"SEK", symbol:"kr", name:"Swedish Krona" },
 ];
 
-// ─── Pay Schedule Options ─────────────────────────────────────────────────────
-const PAY_SCHEDULES = [
-  { id:"every_friday",    label:"Every Friday",          icon:"📅" },
-  { id:"every_2_weeks",   label:"Every Other Friday",     icon:"🗓️" },
-  { id:"last_working_day",label:"Last working day of the Month", icon:"🏦" },
-  { id:"custom",          label:"Custom date",           icon:"✏️" },
+// ─── Pay Schedule ─────────────────────────────────────────────────────────────
+const FREQUENCIES  = [
+  { id:"weekly",    label:"Every week" },
+  { id:"fortnightly",label:"Every 2 weeks" },
+  { id:"monthly",   label:"Every month" },
+  { id:"custom",    label:"Custom date" },
 ];
+const WEEK_DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const WEEK_DAY_SHORT = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 // ─── Date Helpers ─────────────────────────────────────────────────────────────
 function toISO(date) {
@@ -36,55 +38,70 @@ function getLastWorkingDay(year, month) {
   return d;
 }
 
-// Next payday ISO based on schedule
-function getNextPayday(schedule, customDate) {
+// payConfig = { frequency, weekDay (0=Mon..6=Sun), monthDay (1-31 or "last_working"), customDate, anchorDate }
+function getNextPayday(schedule, customDate, payConfig) {
   const today = new Date(); today.setHours(0,0,0,0);
 
-  if (schedule === "every_friday") {
+  // Legacy support for old schedule strings
+  if (!payConfig) {
+    if (schedule === "every_friday")     payConfig = { frequency:"weekly", weekDay:4 };
+    else if (schedule === "every_2_weeks") payConfig = { frequency:"fortnightly", weekDay:4, anchorDate:customDate };
+    else if (schedule === "last_working_day") payConfig = { frequency:"monthly", monthDay:"last_working" };
+    else if (schedule === "custom" && customDate) payConfig = { frequency:"custom", customDate };
+    else payConfig = { frequency:"monthly", monthDay:"last_working" };
+  }
+
+  const { frequency, weekDay=4, monthDay=1, anchorDate } = payConfig;
+
+  if (frequency === "weekly") {
+    // weekDay: 0=Mon..6=Sun, JS: 0=Sun..6=Sat
+    const jsDay = (weekDay + 1) % 7; // convert Mon=0 to JS Sun=0
     let d = new Date(today);
-    const dow = d.getDay(); // 0=Sun,5=Fri
-    const daysUntilFri = dow <= 5 ? 5 - dow : 6; // days until next Friday
-    d.setDate(d.getDate() + (daysUntilFri === 0 ? 7 : daysUntilFri));
+    const curr = d.getDay();
+    let diff = (jsDay - curr + 7) % 7;
+    if (diff === 0) diff = 7; // already today, go next week
+    d.setDate(d.getDate() + diff);
     return toISO(d);
   }
 
-  if (schedule === "every_2_weeks") {
-    // If user has set an anchor payday date, step forward in 14-day increments from that anchor
-    if (customDate) {
-      let anchor = new Date(customDate+"T00:00:00");
+  if (frequency === "fortnightly") {
+    if (anchorDate) {
+      let anchor = new Date(anchorDate+"T00:00:00");
       while (anchor <= today) anchor.setDate(anchor.getDate() + 14);
       return toISO(anchor);
     }
-    // No anchor - find the next Friday, then add 7 more days to make it every OTHER Friday
+    // No anchor — use weekDay, find next occurrence + 7
+    const jsDay = (weekDay + 1) % 7;
     let d = new Date(today);
-    const dow = d.getDay();
-    const daysToFri = (dow <= 5) ? (5 - dow) : 6;
-    d.setDate(d.getDate() + (daysToFri === 0 ? 7 : daysToFri) + 7);
+    const curr = d.getDay();
+    let diff = (jsDay - curr + 7) % 7;
+    if (diff === 0) diff = 7;
+    d.setDate(d.getDate() + diff + 7);
     return toISO(d);
   }
 
-  if (schedule === "last_working_day") {
-    let payday = getLastWorkingDay(today.getFullYear(), today.getMonth());
-    if (today >= payday) {
-      // Move to next month
-      payday = getLastWorkingDay(
-        today.getMonth() === 11 ? today.getFullYear()+1 : today.getFullYear(),
-        today.getMonth() === 11 ? 0 : today.getMonth()+1
+  if (frequency === "monthly") {
+    if (monthDay === "last_working") {
+      let payday = getLastWorkingDay(today.getFullYear(), today.getMonth());
+      if (today >= payday) payday = getLastWorkingDay(
+        today.getMonth()===11 ? today.getFullYear()+1 : today.getFullYear(),
+        today.getMonth()===11 ? 0 : today.getMonth()+1
       );
+      return toISO(payday);
     }
-    return toISO(payday);
-  }
-
-  if (schedule === "custom" && customDate) {
-    let d = new Date(customDate+"T00:00:00");
-    if (d <= today) {
-      // Move forward by a month for custom
-      d.setMonth(d.getMonth()+1);
-    }
+    // Specific day of month
+    const day = parseInt(monthDay)||1;
+    let d = new Date(today.getFullYear(), today.getMonth(), day);
+    if (d <= today) d = new Date(today.getFullYear(), today.getMonth()+1, day);
     return toISO(d);
   }
 
-  // fallback
+  if (frequency === "custom" && payConfig.customDate) {
+    let d = new Date(payConfig.customDate+"T00:00:00");
+    if (d <= today) d.setMonth(d.getMonth()+1);
+    return toISO(d);
+  }
+
   let d = new Date(today); d.setDate(d.getDate() + 30);
   return toISO(d);
 }
@@ -481,6 +498,116 @@ function PaydayModal({ sym, suggestedBalance, onConfirm }) {
   );
 }
 
+
+
+// ─── Pay Schedule Builder ─────────────────────────────────────────────────────
+function PayScheduleBuilder({ payConfig, onChange, sym }) {
+  const cfg = payConfig || { frequency:"monthly", monthDay:"last_working" };
+  const { frequency="monthly", weekDay=4, monthDay="last_working", anchorDate, customDate } = cfg;
+
+  const set = (patch) => onChange({ ...cfg, ...patch });
+
+  const nextPayday = getNextPayday(null, null, cfg);
+  const days = daysUntilPayday(nextPayday);
+
+  return (
+    <div>
+      {/* Frequency */}
+      <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>How often?</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"14px"}}>
+        {FREQUENCIES.map(f=>(
+          <button key={f.id} onClick={()=>set({frequency:f.id})} style={{
+            padding:"12px",borderRadius:"12px",border:"none",textAlign:"center",
+            background:frequency===f.id?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",
+            border:`1px solid ${frequency===f.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,
+            color:frequency===f.id?"#34D399":"rgba(255,255,255,0.45)",
+            fontFamily:"'DM Sans',sans-serif",fontSize:"13px",fontWeight:"600",cursor:"pointer"
+          }}>{f.label}</button>
+        ))}
+      </div>
+
+      {/* Weekly or Fortnightly — pick day of week */}
+      {(frequency==="weekly"||frequency==="fortnightly")&&(
+        <>
+          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Which day?</div>
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"14px"}}>
+            {WEEK_DAYS.map((d,i)=>(
+              <button key={i} onClick={()=>set({weekDay:i,anchorDate:null})} style={{
+                padding:"8px 10px",borderRadius:"10px",border:"none",
+                background:weekDay===i?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",
+                border:`1px solid ${weekDay===i?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,
+                color:weekDay===i?"#34D399":"rgba(255,255,255,0.45)",
+                fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"
+              }}>{WEEK_DAY_SHORT[i]}</button>
+            ))}
+          </div>
+          {frequency==="fortnightly"&&(
+            <div style={{marginBottom:"14px"}}>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>When was your last payday? (sets the cycle)</div>
+              <input type="date" value={anchorDate||""} onChange={e=>set({anchorDate:e.target.value})}
+                style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"12px",padding:"12px 14px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",colorScheme:"dark",boxSizing:"border-box"}}/>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Monthly — pick day of month */}
+      {frequency==="monthly"&&(
+        <>
+          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Which day of the month?</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"14px"}}>
+            <button onClick={()=>set({monthDay:"last_working"})} style={{
+              padding:"12px",borderRadius:"12px",border:"none",textAlign:"center",
+              background:monthDay==="last_working"?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",
+              border:`1px solid ${monthDay==="last_working"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,
+              color:monthDay==="last_working"?"#34D399":"rgba(255,255,255,0.45)",
+              fontFamily:"'DM Sans',sans-serif",fontSize:"13px",fontWeight:"600",cursor:"pointer"
+            }}>Last working day</button>
+            <button onClick={()=>set({monthDay:monthDay==="last_working"?25:monthDay})} style={{
+              padding:"12px",borderRadius:"12px",border:"none",textAlign:"center",
+              background:monthDay!=="last_working"?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",
+              border:`1px solid ${monthDay!=="last_working"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,
+              color:monthDay!=="last_working"?"#34D399":"rgba(255,255,255,0.45)",
+              fontFamily:"'DM Sans',sans-serif",fontSize:"13px",fontWeight:"600",cursor:"pointer"
+            }}>Specific date</button>
+          </div>
+          {monthDay!=="last_working"&&(
+            <>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",marginBottom:"8px"}}>Day of month</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"5px",marginBottom:"14px"}}>
+                {Array.from({length:31},(_,i)=>i+1).map(d=>(
+                  <button key={d} onClick={()=>set({monthDay:d})} style={{
+                    width:"36px",height:"36px",borderRadius:"8px",border:"none",
+                    background:monthDay===d?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",
+                    border:`1px solid ${monthDay===d?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.07)"}`,
+                    color:monthDay===d?"#34D399":"rgba(255,255,255,0.4)",
+                    fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"
+                  }}>{d}</button>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* Custom date */}
+      {frequency==="custom"&&(
+        <div style={{marginBottom:"14px"}}>
+          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Next payday date</div>
+          <input type="date" value={customDate||""} onChange={e=>set({customDate:e.target.value})}
+            style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"12px",padding:"12px 14px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",colorScheme:"dark",boxSizing:"border-box"}}/>
+        </div>
+      )}
+
+      {/* Preview */}
+      <div style={{background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:"12px",padding:"12px 14px"}}>
+        <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"3px"}}>Next payday</div>
+        <div style={{fontSize:"14px",color:"#34D399",fontWeight:"600"}}>{longDate(nextPayday)}</div>
+        <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>{days} days away</div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Recurring Bills Sheet ────────────────────────────────────────────────────
 const BILL_FREQUENCIES = [
@@ -935,8 +1062,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
   const [balance,   setBalance]   = useState(String(setup.currentBalance));
   const [salary,    setSalary]    = useState(String(setup.monthlySalary));
   const [currency,  setCurrency]  = useState(setup.currency);
-  const [schedule,  setSchedule]  = useState(setup.paySchedule||"last_working_day");
-  const [customDate,setCustomDate]= useState(setup.customPayDate||"");
+  const [payConfig, setPayConfig] = useState(setup.payConfig||{frequency:"monthly",monthDay:"last_working"});
   const [showFaq,   setShowFaq]   = useState(false);
   const sym = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
 
@@ -945,8 +1071,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
       setBalance(String(setup.currentBalance));
       setSalary(String(setup.monthlySalary));
       setCurrency(setup.currency);
-      setSchedule(setup.paySchedule||"last_working_day");
-      setCustomDate(setup.customPayDate||"");
+      setPayConfig(setup.payConfig||{frequency:"monthly",monthDay:"last_working"});
     }
   },[open]);
 
@@ -985,27 +1110,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
           {/* Pay schedule */}
           <div style={{marginBottom:"20px"}}>
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Pay Schedule</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"10px"}}>
-              {PAY_SCHEDULES.map(s=>(
-                <button key={s.id} onClick={()=>setSchedule(s.id)} style={{padding:"14px 12px",borderRadius:"14px",border:`1px solid ${schedule===s.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,background:schedule===s.id?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",color:schedule===s.id?"#34D399":"rgba(255,255,255,0.45)",fontFamily:"'DM Sans',sans-serif",cursor:"pointer",textAlign:"left"}}>
-                  <div style={{fontSize:"18px",marginBottom:"4px"}}>{s.icon}</div>
-                  <div style={{fontSize:"13px",fontWeight:"600"}}>{s.label}</div>
-                </button>
-              ))}
-            </div>
-            {schedule==="custom"&&(
-              <input type="date" value={customDate} onChange={e=>setCustomDate(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:"12px",padding:"12px 16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",colorScheme:"dark",boxSizing:"border-box"}}/>
-            )}
-            {schedule==="every_2_weeks"&&(
-              <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"6px"}}>Next payday: <span style={{color:"rgba(255,255,255,0.6)"}}>{longDate(nextPayday)}</span></div>
-            )}
-          </div>
-
-          {/* Next payday info */}
-          <div style={{background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:"14px",padding:"14px 16px",marginBottom:"20px"}}>
-            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"4px"}}>Next Payday</div>
-            <div style={{fontSize:"15px",color:"#34D399",fontWeight:"600"}}>{longDate(nextPayday)}</div>
-            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>{days} spending days remaining</div>
+            <PayScheduleBuilder payConfig={payConfig} onChange={setPayConfig}/>
           </div>
 
           {/* Balance */}
@@ -1031,7 +1136,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
           <button onClick={()=>{
             const bal=parseFloat(balance)||0;
             const sal=parseFloat(salary)||0;
-            if(bal>0) onSave({currentBalance:bal,monthlySalary:sal,currency,paySchedule:schedule,customPayDate:customDate});
+            if(bal>0) onSave({currentBalance:bal,monthlySalary:sal,currency,payConfig});
             onClose();
           }} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"16px",cursor:"pointer",boxShadow:"0 6px 24px rgba(167,139,250,0.3)"}}>
             Save Changes
@@ -1076,14 +1181,13 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
 function SetupScreen({ onComplete }) {
   const [step,       setStep]       = useState(0);
   const [currency,   setCurrency]   = useState("GBP");
-  const [schedule,   setSchedule]   = useState("last_working_day");
-  const [customDate, setCustomDate] = useState("");
+  const [payConfig,  setPayConfig]  = useState({ frequency:"monthly", monthDay:"last_working" });
   const [salInput,   setSalInput]   = useState("");
   const [balInput,   setBalInput]   = useState("");
   const [activeField,setActiveField]= useState("balance");
 
   const sym = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
-  const nextPayday = getNextPayday(schedule, customDate);
+  const nextPayday = getNextPayday(null, null, payConfig);
   const days = daysUntilPayday(nextPayday);
   const salNum = parseFloat(salInput)||0;
   const balNum = parseFloat(balInput)||0;
@@ -1137,29 +1241,8 @@ function SetupScreen({ onComplete }) {
         <div style={{animation:"slideUp 0.35s ease"}}>
           <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"28px",fontWeight:"700",marginBottom:"8px"}}>When do you get paid?</div>
           <div style={{fontSize:"14px",color:"rgba(255,255,255,0.4)",lineHeight:1.6,marginBottom:"20px"}}>We'll automatically add your income on payday and ask you to confirm your balance.</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"14px"}}>
-            {PAY_SCHEDULES.map(s=>(
-              <button key={s.id} onClick={()=>setSchedule(s.id)} style={{padding:"18px 14px",borderRadius:"18px",border:`1px solid ${schedule===s.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,background:schedule===s.id?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",color:schedule===s.id?"#34D399":"rgba(255,255,255,0.45)",fontFamily:"'DM Sans',sans-serif",cursor:"pointer",textAlign:"left"}}>
-                <div style={{fontSize:"24px",marginBottom:"6px"}}>{s.icon}</div>
-                <div style={{fontSize:"14px",fontWeight:"700"}}>{s.label}</div>
-              </button>
-            ))}
-          </div>
-          {schedule==="custom"&&(
-            <div style={{marginBottom:"14px"}}>
-              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Choose your payday date</div>
-              <input type="date" value={customDate} onChange={e=>setCustomDate(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px 16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"15px",outline:"none",colorScheme:"dark",boxSizing:"border-box"}}/>
-            </div>
-          )}
-
-          {/* Payday preview */}
-          <div style={{background:"rgba(52,211,153,0.07)",border:"1px solid rgba(52,211,153,0.18)",borderRadius:"14px",padding:"14px 16px",marginBottom:"20px"}}>
-            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"4px"}}>Next payday</div>
-            <div style={{fontSize:"15px",color:"#34D399",fontWeight:"600"}}>{longDate(nextPayday)}</div>
-            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>{days} spending days remaining (payday not included)</div>
-          </div>
-
-          <div style={{display:"flex",gap:"10px"}}>
+          <PayScheduleBuilder payConfig={payConfig} onChange={setPayConfig}/>
+          <div style={{display:"flex",gap:"10px",marginTop:"20px"}}>
             <button onClick={()=>setStep(0)} style={{padding:"18px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"18px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>←</button>
             <button onClick={()=>setStep(2)} style={{flex:1,padding:"18px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"18px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"16px",cursor:"pointer",boxShadow:"0 8px 30px rgba(167,139,250,0.3)"}}>Continue →</button>
           </div>
@@ -1269,7 +1352,7 @@ export default function DayPay() {
   // Lock the daily budget at start of each day — simple, no reconstruction
   useEffect(()=>{
     if(!setup) return;
-    const d = daysUntilPayday(setup.nextPayday || getNextPayday(setup.paySchedule, setup.customPayDate));
+    const d = daysUntilPayday(setup.nextPayday || getNextPayday(null, null, setup.payConfig));
     const newLocked = d>0 ? parseFloat((setup.currentBalance/d).toFixed(2)) : parseFloat(setup.currentBalance.toFixed(2));
     setLockedDailyBudget(newLocked);
   },[]);
@@ -1317,7 +1400,7 @@ export default function DayPay() {
       }
     });
     const allEx = [...ex, ...dueBills];
-    const nextPayday = s.nextPayday || getNextPayday(s.paySchedule, s.customPayDate);
+    const nextPayday = s.nextPayday || getNextPayday(null, null, s.payConfig);
     const days  = daysUntilPayday(nextPayday);
     const daily = days>0 ? s.currentBalance/days : s.currentBalance;
     const spent = allEx.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((t,e)=>t+e.amount,0);
@@ -1406,7 +1489,7 @@ export default function DayPay() {
       `}</style>
       <SetupScreen onComplete={s=>{
         const np = s.nextPayday || getNextPayday(s.paySchedule, s.customPayDate);
-        setSetup({...s, nextPayday:np});
+        setSetup({...s, nextPayday:np, payConfig:s.payConfig||payConfig});
         setLastClosedDate(todayISO());
       }}/>
     </>
@@ -1414,7 +1497,7 @@ export default function DayPay() {
 
   const { currency, currentBalance, nextPayday: storedPayday, paySchedule, customPayDate, monthlySalary } = setup;
   const sym      = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
-  const payday   = storedPayday || getNextPayday(paySchedule, customPayDate);
+  const payday   = storedPayday || getNextPayday(null, null, setup.payConfig);
   const days     = daysUntilPayday(payday);
   const billsReservedPerDay = 0; // bills now deduct on the day, not spread
   // Use locked daily budget (set at start of day) — only changes with income or settings update
@@ -1541,7 +1624,7 @@ export default function DayPay() {
 
       {/* Sheets */}
       <SettingsSheet open={showSettings} onClose={()=>setShowSettings(false)} setup={{...setup,nextPayday:payday,currentBalance:parseFloat(Math.max(0,currentBalance-spent).toFixed(2))}} onSave={s=>{
-        const np = getNextPayday(s.paySchedule, s.customPayDate);
+        const np = getNextPayday(null, null, s.payConfig||payConfig);
         // Reverse-engineer the true base currentBalance so the front screen shows
         // exactly what the user typed, with all existing transactions intact.
         //
