@@ -1077,9 +1077,8 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
 
   if(!open) return null;
 
-  const nextPayday = getNextPayday(schedule, customDate||setup.customPayDate);
+  const nextPayday = getNextPayday(null, null, payConfig);
   const days = daysUntilPayday(nextPayday);
-  const daily = days>0?(parseFloat(balance)||0)/days:0;
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
