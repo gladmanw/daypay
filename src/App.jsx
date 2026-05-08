@@ -1289,7 +1289,7 @@ function SetupScreen({ onComplete }) {
           <div style={{display:"flex",gap:"10px"}}>
             <button onClick={()=>setStep(2)} style={{padding:"18px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"18px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>←</button>
             <button onClick={()=>{
-              if(balNum>0) onComplete({monthlySalary:salNum,currentBalance:balNum,currency,paySchedule:schedule,customPayDate:customDate,nextPayday});
+              if(balNum>0) onComplete({monthlySalary:salNum,currentBalance:balNum,currency,payConfig,nextPayday});
             }} disabled={balNum<=0} style={{flex:1,padding:"18px",background:balNum>0?"linear-gradient(135deg,#34D399,#059669)":"rgba(255,255,255,0.05)",border:"none",borderRadius:"18px",color:balNum>0?"#061a0e":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"16px",cursor:balNum>0?"pointer":"default",boxShadow:balNum>0?"0 8px 30px rgba(52,211,153,0.28)":"none"}}>
               {balNum>0?`Start — ${sym}${daily.toFixed(2)}/day 🚀`:"Enter balance to begin"}
             </button>
@@ -1488,8 +1488,8 @@ export default function DayPay() {
         button:active{transform:scale(0.96)}
       `}</style>
       <SetupScreen onComplete={s=>{
-        const np = s.nextPayday || getNextPayday(s.paySchedule, s.customPayDate);
-        setSetup({...s, nextPayday:np, payConfig:s.payConfig||payConfig});
+        const np = s.nextPayday || getNextPayday(null, null, s.payConfig);
+        setSetup({...s, nextPayday:np});
         setLastClosedDate(todayISO());
       }}/>
     </>
