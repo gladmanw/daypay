@@ -1472,8 +1472,9 @@ export default function DayPay() {
                   <span style={{fontSize:"10px",color:"rgba(255,255,255,0.3)"}}>goal</span>
                 </div>
               ) : (
-                <div onClick={()=>setEditingPotGoal(true)} style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:"4px"}}>
-                  {sym}{potGoal} goal <span style={{color:"rgba(52,211,153,0.4)"}}>✎</span>
+                <div onClick={()=>setEditingPotGoal(true)} style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",cursor:"pointer",display:"flex",alignItems:"center",gap:"6px",marginTop:"2px"}}>
+                  <span>{sym}{potGoal} goal</span>
+                  <span style={{background:"rgba(52,211,153,0.15)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:"6px",padding:"1px 6px",color:"#34D399",fontSize:"10px",fontWeight:"600"}}>Edit</span>
                 </div>
               )}
             </div>
