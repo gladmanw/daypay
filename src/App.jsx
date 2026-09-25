@@ -672,13 +672,14 @@ const FAQ_ITEMS = [
   {q:"What happens when I add income to my main account?", a:"Income is added to your current balance immediately. It doesn't change today's daily budget — but tomorrow when the day resets, the new daily budget will be calculated from your updated balance including the income."},
   {q:"What is 'What's Left'?", a:"What's Left is your daily budget minus today's expenses. It shows how much of today's allowance you still have. It goes down as you spend and is separate from your current balance."},
   {q:"What's the difference between Current Balance and What's Left?", a:"Current Balance is the total money in your main account — it updates with income and is cleared of expenses at midnight. What's Left is just today's remaining daily allowance."},
-  {q:"How do credit card expenses work?", a:"Credit card expenses are tracked separately and don't affect your daily budget or current balance — because the money hasn't actually left your account yet. Your card shows an Owed balance so you always know what you'll need to pay off."},
-  {q:"How do I pay off my credit card?", a:"Use Income mode and select Pay [card name]. This reduces what you owe and deducts from your current balance. If the payment already left automatically, use Pay [card name] (no deduct) to just update the balance owed without touching your current balance."},
-  {q:"What are recurring bills?", a:"Bills are regular payments like Netflix or rent. Add them in the Bills section and they'll automatically create an expense and deduct from your account on their due date. The Bills icon shows a red badge counting how many are coming up this month."},
-  {q:"When does my day reset?", a:"At midnight your day closes automatically. Your current balance is updated, a summary appears when you next open the app, and a fresh daily budget is calculated for the new day."},
-  {q:"How do I update my current balance?", a:"Go to Settings and update the Current Balance field. When you save, the app works backwards so that the number you type is exactly what shows on the main screen — your existing transactions stay intact."},
-  {q:"How does the streak work?", a:"Your streak counts consecutive days you stayed under budget without manually adjusting your balance. If you update your balance in Settings on a given day, that day won't extend the streak — but it won't break it either. Only a day over budget resets it to zero."},
-  {q:"How does the savings pot work?", a:"Every day you close under budget, the amount you saved (daily budget minus spending) gets added to your savings pot. It resets each pay period, but you can see your pot history to track how much you've saved over time. Set a goal and watch the bar fill up."},
+  {q:"How do credit cards work?", a:"Add your credit cards in the Cards section. Credit card expenses are tracked separately and don't affect your daily budget or current balance — because the money hasn't actually left your account yet. Each card shows what you currently owe."},
+  {q:"How do I pay off my credit card?", a:"Use Income mode and select Pay [card name]. This reduces what you owe on the card and deducts from your current balance. If the payment has already left your account automatically, use Pay [card name] (no deduct) to just update the balance owed without touching your current balance."},
+  {q:"What are recurring bills?", a:"Bills are regular payments like Netflix or rent. Add them in the Bills section with a name, amount, frequency and due date. On the due date the app automatically creates an expense and deducts from your balance. The red badge on the Bills icon shows how many bills are coming up this month."},
+  {q:"When does my day reset?", a:"At midnight your day closes automatically. Your current balance is updated, a summary of the day appears when you next open the app, and a fresh daily budget is calculated for the new day."},
+  {q:"How do I update my current balance?", a:"Go to Settings and update the Current Balance field. When you save, the app works backwards so the number you type is exactly what shows on the main screen — your existing transactions stay intact. Note: updating your balance on a given day will pause your streak and savings pot for that day."},
+  {q:"How does the streak work?", a:"Your streak counts consecutive days you stayed under budget without manually adjusting your balance. If you update your balance in Settings on a given day, the streak is paused for that day — it won't extend, but it won't break either. Only a day over budget resets it to zero."},
+  {q:"How does the savings pot work?", a:"Every day you close under budget without adjusting your balance, the amount you saved (daily budget minus spending) is added to your pot. Tap the goal to set your own target. The pot resets each payday so every pay period is a fresh start. If you adjust your balance on a day, no savings are added for that day to keep things fair."},
+  {q:"Why does my streak say 'Balance updated today — Streak paused · No savings added'?", a:"This appears when you've updated your current balance in Settings on the same day. To keep things fair, the app doesn't count that day toward your streak or add to your savings pot, since the balance change could affect what counts as 'under budget'. Your existing streak and savings are safe — just that one day is skipped."},
 ];
 
 function FaqItem({ item }) {
@@ -976,6 +977,7 @@ export default function DayPay() {
   const [potGoal,            setPotGoal]            = useState(saved?.potGoal            ?? 200);
   const [potHistory,         setPotHistory]         = useState(saved?.potHistory         ?? []);
   const [balanceAdjustedToday,setBalanceAdjustedToday]= useState(saved?.balanceAdjustedToday ?? false);
+  const [editingPotGoal,  setEditingPotGoal]  = useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
@@ -1449,7 +1451,11 @@ export default function DayPay() {
               <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Streak</div>
               <div style={{fontSize:"38px",fontWeight:"700",color:streak>0?"#FBBF24":"rgba(255,255,255,0.2)",fontFamily:"'Cormorant Garamond',serif",lineHeight:1,marginBottom:"4px"}}>{streak}</div>
               <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)"}}>{streak===1?"day":"days"} under budget</div>
-              {balanceAdjustedToday&&<div style={{fontSize:"10px",color:"rgba(251,191,36,0.4)",marginTop:"4px"}}>adjusted today</div>}
+              {balanceAdjustedToday&&(
+                <div style={{fontSize:"10px",color:"rgba(251,191,36,0.5)",marginTop:"6px",lineHeight:1.6}}>
+                  Balance updated today<br/>Streak paused · No savings added
+                </div>
+              )}
             </div>
             <div style={{background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:"20px",padding:"16px"}}>
               <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Savings Pot</div>
@@ -1457,7 +1463,19 @@ export default function DayPay() {
               <div style={{background:"rgba(255,255,255,0.08)",borderRadius:"4px",height:"4px",overflow:"hidden",marginBottom:"4px"}}>
                 <div style={{height:"100%",width:`${Math.min(potGoal>0?(savingsPot/potGoal)*100:0,100)}%`,background:"#34D399",borderRadius:"4px"}}/>
               </div>
-              <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)"}}>{sym}{potGoal} goal</div>
+              {editingPotGoal ? (
+                <div style={{display:"flex",gap:"6px",alignItems:"center",marginTop:"2px"}}>
+                  <input type="number" defaultValue={potGoal} autoFocus
+                    onBlur={e=>{const v=parseFloat(e.target.value);if(v>0)setPotGoal(v);setEditingPotGoal(false);}}
+                    onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(e.target.value);if(v>0)setPotGoal(v);setEditingPotGoal(false);}}}
+                    style={{width:"80px",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(52,211,153,0.4)",borderRadius:"8px",padding:"4px 8px",color:"#34D399",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",outline:"none"}}/>
+                  <span style={{fontSize:"10px",color:"rgba(255,255,255,0.3)"}}>goal</span>
+                </div>
+              ) : (
+                <div onClick={()=>setEditingPotGoal(true)} style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",cursor:"pointer",display:"flex",alignItems:"center",gap:"4px"}}>
+                  {sym}{potGoal} goal <span style={{color:"rgba(52,211,153,0.4)"}}>✎</span>
+                </div>
+              )}
             </div>
           </div>
 
