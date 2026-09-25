@@ -1403,7 +1403,7 @@ export default function DayPay() {
                   style={{width:"14px",height:"14px",borderRadius:"50%",background:"rgba(167,139,250,0.15)",border:"1px solid rgba(167,139,250,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"9px",color:"#A78BFA",cursor:"pointer",flexShrink:0}}
                 >?</div>
                 {showBudgetTip&&(
-                  <div style={{position:"absolute",top:"calc(100%+8px)",left:0,background:"rgba(12,12,28,0.98)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px",width:"220px",zIndex:50,boxShadow:"0 8px 24px rgba(0,0,0,0.5)",animation:"fadeIn 0.15s ease"}} onClick={()=>setShowBudgetTip(false)}>
+                  <div style={{position:"absolute",top:"calc(100% + 8px)",left:0,right:0,background:"rgba(12,12,28,0.98)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px",zIndex:50,boxShadow:"0 8px 24px rgba(0,0,0,0.5)",animation:"fadeIn 0.15s ease"}} onClick={()=>setShowBudgetTip(false)}>
                     <div style={{fontSize:"11px",color:"#A78BFA",fontWeight:"600",marginBottom:"5px"}}>💡 How is this calculated?</div>
                     <div style={{fontSize:"11px",color:"rgba(255,255,255,0.65)",lineHeight:1.7}}>
                       Your daily budget is your <strong style={{color:"#fff"}}>current balance ÷ days until payday</strong> — not including payday itself. This way your budget is based only on the money already in your account, not your upcoming paycheck.
