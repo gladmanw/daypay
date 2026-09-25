@@ -1381,7 +1381,7 @@ export default function DayPay() {
     const dueBills = storedBills.filter(b => {
       if(b.frequency==="daily") return true;
       if(b.frequency==="weekly") return today2.getDay()===5; // every Friday
-      if(b.frequency==="monthly") return today2.getDate()===b.dayOfMonth;
+      if(b.frequency==="monthly") return today2.getDate()===parseInt(b.dayOfMonth);
       return false;
     }).map(b => ({
       id:`bill_auto_${b.id}_${Date.now()}`,
@@ -1423,7 +1423,7 @@ export default function DayPay() {
     if(isTodayPayday(nextPayday)){
       // Add income and show payday modal
       const suggested = newBalance + s.monthlySalary;
-      const newNextPayday = getNextPayday(s.paySchedule, s.customPayDate);
+      const newNextPayday = getNextPayday(null, null, s.payConfig);
       setSetup(prev=>({...prev,currentBalance:suggested,nextPayday:newNextPayday}));
       setPaydayModal({suggestedBalance:suggested});
       // Reset trophies
@@ -1650,6 +1650,7 @@ export default function DayPay() {
       <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym} accounts={accounts}
         onAdd={b=>setBills(prev=>[...prev,b])}
         onDelete={id=>setBills(prev=>prev.filter(b=>b.id!==id))}
+
       />
       <AccountsSheet open={showAccounts} onClose={()=>setShowAccounts(false)} accounts={accounts} sym={sym} activeAccount={activeAccount}
         onAdd={a=>setAccounts(prev=>[...prev,a])}
