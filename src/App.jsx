@@ -1402,14 +1402,7 @@ export default function DayPay() {
                   onClick={()=>setShowBudgetTip(v=>!v)}
                   style={{width:"14px",height:"14px",borderRadius:"50%",background:"rgba(167,139,250,0.15)",border:"1px solid rgba(167,139,250,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"9px",color:"#A78BFA",cursor:"pointer",flexShrink:0}}
                 >?</div>
-                {showBudgetTip&&(
-                  <div style={{position:"absolute",top:"calc(100% + 8px)",left:0,right:0,background:"rgba(12,12,28,0.98)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px",zIndex:50,boxShadow:"0 8px 24px rgba(0,0,0,0.5)",animation:"fadeIn 0.15s ease"}} onClick={()=>setShowBudgetTip(false)}>
-                    <div style={{fontSize:"11px",color:"#A78BFA",fontWeight:"600",marginBottom:"5px"}}>💡 How is this calculated?</div>
-                    <div style={{fontSize:"11px",color:"rgba(255,255,255,0.65)",lineHeight:1.7}}>
-                      Your daily budget is your <strong style={{color:"#fff"}}>current balance ÷ days until payday</strong> — not including payday itself. This way your budget is based only on the money already in your account, not your upcoming paycheck.
-                    </div>
-                  </div>
-                )}
+
               </div>
             </div>
             <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"38px",fontWeight:"700",color:"#34D399",lineHeight:1}}>
@@ -1428,6 +1421,16 @@ export default function DayPay() {
             <div style={{fontSize:"11px",color:barCol,marginTop:"4px",fontWeight:"600"}}>{pct.toFixed(0)}% used</div>
           </div>
         </div>
+
+        {/* Budget tip */}
+        {showBudgetTip&&(
+          <div style={{background:"rgba(12,12,28,0.95)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px",marginBottom:"8px",animation:"slideUp 0.2s ease"}} onClick={()=>setShowBudgetTip(false)}>
+            <div style={{fontSize:"11px",color:"#A78BFA",fontWeight:"600",marginBottom:"5px"}}>💡 How is this calculated?</div>
+            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.65)",lineHeight:1.7}}>
+              Your daily budget is your <strong style={{color:"#fff"}}>current balance ÷ days until payday</strong> — not including payday itself. This keeps your budget based only on the money already in your account. Tap anywhere to close.
+            </div>
+          </div>
+        )}
 
         {/* Credit card balances */}
         {creditCards.length>0&&(
