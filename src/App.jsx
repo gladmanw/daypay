@@ -978,13 +978,14 @@ export default function DayPay() {
   const [potGoal,            setPotGoal]            = useState(saved?.potGoal            ?? 200);
   const [potHistory,         setPotHistory]         = useState(saved?.potHistory         ?? []);
   const [balanceAdjustedToday,setBalanceAdjustedToday]= useState(saved?.balanceAdjustedToday ?? false);
+  const [streakHistory,      setStreakHistory]      = useState(saved?.streakHistory      ?? []);
   const [editingPotGoal,  setEditingPotGoal]  = useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday});
-  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday]);
+    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory});
+  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory]);
 
   // On app open — check if day has changed
   useEffect(()=>{
@@ -1068,13 +1069,17 @@ export default function DayPay() {
     // Check if today is payday
     const todayStr = todayISO();
     if(isTodayPayday(nextPayday)){
+      // Log current streak to history before resetting
+      const currentStreak = (()=>{ let s2=0; const h=[...(stored.history??[]),summary]; for(let i=h.length-1;i>=0;i--){if(h[i].under&&!h[i].adjusted)s2++;else break;} return s2; })();
+      if(currentStreak > 0){
+        setStreakHistory(prev=>[{streak:currentStreak, date:dateStr, label:shortDate(nextPayday)}, ...prev].slice(0,24));
+      }
       // Add income and show payday modal
       const suggested = newBalance + s.monthlySalary;
       const newNextPayday = getNextPayday(null, null, s.payConfig);
       setSetup(prev=>({...prev,currentBalance:suggested,nextPayday:newNextPayday}));
       setPaydayModal({suggestedBalance:suggested});
-      // Reset trophies
-      // trophies removed — pot resets each pay period
+      // Reset pot and streak each pay period
       setSavingsPot(0);
       setPotHistory([]);
     } else {
@@ -1452,6 +1457,17 @@ export default function DayPay() {
               <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Streak</div>
               <div style={{fontSize:"38px",fontWeight:"700",color:streak>0?"#FBBF24":"rgba(255,255,255,0.2)",fontFamily:"'Cormorant Garamond',serif",lineHeight:1,marginBottom:"4px"}}>{streak}</div>
               <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)"}}>{streak===1?"day":"days"} under budget</div>
+              {streakHistory.length>0&&(
+                <div style={{marginTop:"8px",paddingTop:"8px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                  <div style={{fontSize:"10px",color:"rgba(255,255,255,0.25)",marginBottom:"4px"}}>Previous</div>
+                  {streakHistory.slice(0,3).map((h,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"2px"}}>
+                      <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)"}}>{h.label}</div>
+                      <div style={{fontSize:"11px",color:"#FBBF24",fontWeight:"600"}}>{h.streak}d</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {balanceAdjustedToday&&(
                 <div style={{fontSize:"10px",color:"rgba(251,191,36,0.5)",marginTop:"6px",lineHeight:1.6}}>
                   Balance updated today<br/>Streak paused · No savings added
