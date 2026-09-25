@@ -1,3 +1,4 @@
+// Day Pay v1.1
 import React, { useState, useEffect, useRef } from "react";
 
 // ─── Currencies ───────────────────────────────────────────────────────────────
