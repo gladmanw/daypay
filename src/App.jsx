@@ -979,13 +979,14 @@ export default function DayPay() {
   const [potHistory,         setPotHistory]         = useState(saved?.potHistory         ?? []);
   const [balanceAdjustedToday,setBalanceAdjustedToday]= useState(saved?.balanceAdjustedToday ?? false);
   const [streakHistory,      setStreakHistory]      = useState(saved?.streakHistory      ?? []);
+  const [potHistoryLog,      setPotHistoryLog]      = useState(saved?.potHistoryLog      ?? []);
   const [editingPotGoal,  setEditingPotGoal]  = useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory});
-  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory]);
+    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog});
+  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog]);
 
   // On app open — check if day has changed
   useEffect(()=>{
@@ -1079,6 +1080,11 @@ export default function DayPay() {
       const newNextPayday = getNextPayday(null, null, s.payConfig);
       setSetup(prev=>({...prev,currentBalance:suggested,nextPayday:newNextPayday}));
       setPaydayModal({suggestedBalance:suggested});
+      // Log savings pot total before reset
+      const currentPot = stored.savingsPot ?? 0;
+      if(currentPot > 0){
+        setPotHistoryLog(prev=>[{amount:currentPot, date:dateStr, label:shortDate(nextPayday)}, ...prev].slice(0,24));
+      }
       // Reset pot and streak each pay period
       setSavingsPot(0);
       setPotHistory([]);
@@ -1498,15 +1504,28 @@ export default function DayPay() {
           </div>
 
           {/* Pot history */}
-          {potHistory.length>0&&(
+          {(potHistory.length>0||potHistoryLog.length>0)&&(
             <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"20px",padding:"16px",marginBottom:"10px"}}>
               <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Savings History</div>
+              {/* This period daily entries */}
               {potHistory.slice(0,5).map((h,i)=>(
-                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<Math.min(potHistory.length,5)-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                <div key={`d${i}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                   <div style={{fontSize:"12px",color:"rgba(255,255,255,0.5)"}}>{longDate(h.date)}</div>
                   <div style={{fontSize:"12px",color:"#34D399",fontWeight:"600"}}>+{sym}{h.amount.toFixed(2)}</div>
                 </div>
               ))}
+              {/* Previous pay periods */}
+              {potHistoryLog.length>0&&(
+                <>
+                  <div style={{fontSize:"10px",color:"rgba(255,255,255,0.2)",letterSpacing:"1.5px",textTransform:"uppercase",margin:"8px 0 6px"}}>Previous periods</div>
+                  {potHistoryLog.slice(0,6).map((h,i)=>(
+                    <div key={`p${i}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<Math.min(potHistoryLog.length,6)-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
+                      <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)"}}>{h.label}</div>
+                      <div style={{fontSize:"12px",color:"#34D399",fontWeight:"600"}}>{sym}{h.amount.toFixed(2)}</div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </>
