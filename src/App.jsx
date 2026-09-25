@@ -1045,6 +1045,7 @@ export default function DayPay() {
   const [streakHistory,      setStreakHistory]      = useState(saved?.streakHistory      ?? []);
   const [potHistoryLog,      setPotHistoryLog]      = useState(saved?.potHistoryLog      ?? []);
   const [editingPotGoal,  setEditingPotGoal]  = useState(false);
+  const [showFaqMain,     setShowFaqMain]     = useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
@@ -1343,6 +1344,20 @@ export default function DayPay() {
         setSetup(prev=>({...prev,...s,currentBalance:trueBase,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins} streakHistory={streakHistory} potHistoryLog={potHistoryLog}/>
+      {showFaqMain&&(
+        <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+          <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={()=>setShowFaqMain(false)}/>
+          <div style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"88vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"}}>
+            <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
+              <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
+            </div>
+            <div style={{padding:"0 24px 8px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>How Day Pay Works</div>
+              <FaqList/>
+            </div>
+          </div>
+        </div>
+      )}
       <CreditCardSheet open={showCreditCards} onClose={()=>setShowCreditCards(false)} creditCards={creditCards} sym={sym}
         onAdd={c=>setCreditCards(prev=>[...prev,c])}
         onDelete={id=>setCreditCards(prev=>prev.filter(c=>c.id!==id))}
@@ -1667,6 +1682,7 @@ export default function DayPay() {
           {icon:"📊", label:"History",  action:()=>setShowHistory(true)},
           {icon:"💳", label:"Cards",    action:()=>setShowCreditCards(true)},
           {icon:"🔄", label:"Bills",    action:()=>setShowBills(true), badge:upcomingBillsCount},
+          {icon:"❓", label:"FAQ",      action:()=>setShowFaqMain(true)},
           {icon:"⚙️", label:"Settings", action:()=>setShowSettings(true)},
         ].map(item=>(
           <button key={item.label} onClick={item.action} style={{
