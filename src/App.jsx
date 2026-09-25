@@ -488,6 +488,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
   const [day,      setDay]      = useState("1");
   const [billAccId,setBillAccId]= useState("main");
 
+  const [tab, setTab] = React.useState("spending");
   if (!open) return null;
 
   const handleAdd = () => {
@@ -583,7 +584,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
 }
 
 // ─── History Sheet ────────────────────────────────────────────────────────────
-function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
+function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHistory, potHistoryLog }) {
   const [translateY, setTranslateY] = React.useState(0);
   const startY = React.useRef(null);
   const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
@@ -610,14 +611,22 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
           <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
         </div>
         <div style={{padding:"0 24px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>History</div>
-            <div style={{display:"flex",gap:"12px"}}>
-              {streak>0&&<div style={{fontSize:"13px",color:"#FBBF24"}}>🔥 {streak}</div>}
-              <div style={{fontSize:"13px",color:"#34D399"}}>✓ {totalWins} days</div>
-            </div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>History</div>
+
+          {/* Tabs */}
+          <div style={{display:"flex",gap:"6px",marginBottom:"20px",background:"rgba(0,0,0,0.2)",borderRadius:"14px",padding:"4px"}}>
+            {[{id:"spending",label:"Spending"},{id:"streak",label:"Streak"},{id:"savings",label:"Savings"}].map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+                flex:1,padding:"9px",borderRadius:"10px",border:"none",
+                background:tab===t.id?"rgba(255,255,255,0.08)":"transparent",
+                color:tab===t.id?"#fff":"rgba(255,255,255,0.35)",
+                fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"13px",cursor:"pointer"
+              }}>{t.label}</button>
+            ))}
           </div>
-          {history.length===0 ? (
+
+          {/* Spending tab */}
+          {tab==="spending"&&(history.length===0 ? (
             <div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.25)",fontSize:"14px"}}>Your daily summaries will appear here</div>
           ) : (
             <>
@@ -659,6 +668,61 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
                 );
               })}
             </>
+          ))}
+
+          {/* Streak tab */}
+          {tab==="streak"&&(
+            streakHistory.length===0 ? (
+              <div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.25)",fontSize:"14px"}}>
+                <div style={{fontSize:"32px",marginBottom:"10px",opacity:0.3}}>🔥</div>
+                Your streak history will appear here after your first payday
+              </div>
+            ) : (
+              <>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
+                  <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>Current streak</div>
+                  <div style={{fontSize:"20px",fontWeight:"700",color:"#FBBF24",fontFamily:"'Cormorant Garamond',serif"}}>{streak} days</div>
+                </div>
+                {streakHistory.map((h,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    <div>
+                      <div style={{fontSize:"13px",color:"#fff",fontWeight:"600"}}>{h.label}</div>
+                      <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginTop:"2px"}}>Pay period ending</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                      <div style={{fontSize:"22px",fontWeight:"700",color:"#FBBF24",fontFamily:"'Cormorant Garamond',serif"}}>{h.streak}</div>
+                      <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)"}}>days</div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )
+          )}
+
+          {/* Savings tab */}
+          {tab==="savings"&&(
+            potHistoryLog.length===0 ? (
+              <div style={{textAlign:"center",padding:"40px 0",color:"rgba(255,255,255,0.25)",fontSize:"14px"}}>
+                <div style={{fontSize:"32px",marginBottom:"10px",opacity:0.3}}>💰</div>
+                Your savings history will appear here after your first payday
+              </div>
+            ) : (
+              <>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
+                  <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>This period</div>
+                  <div style={{fontSize:"20px",fontWeight:"700",color:"#34D399",fontFamily:"'Cormorant Garamond',serif"}}>{sym}{(potHistoryLog[0]?.amount||0).toFixed(2)}</div>
+                </div>
+                {potHistoryLog.map((h,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    <div>
+                      <div style={{fontSize:"13px",color:"#fff",fontWeight:"600"}}>{h.label}</div>
+                      <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginTop:"2px"}}>Pay period ending</div>
+                    </div>
+                    <div style={{fontSize:"18px",fontWeight:"700",color:"#34D399",fontFamily:"'Cormorant Garamond',serif"}}>{sym}{h.amount.toFixed(2)}</div>
+                  </div>
+                ))}
+              </>
+            )
           )}
         </div>
       </div>
@@ -1278,7 +1342,7 @@ export default function DayPay() {
         setBalanceAdjustedToday(true); // flag so streak doesn't extend today
         setSetup(prev=>({...prev,...s,currentBalance:trueBase,nextPayday:np}));
       }}/>
-      <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
+      <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins} streakHistory={streakHistory} potHistoryLog={potHistoryLog}/>
       <CreditCardSheet open={showCreditCards} onClose={()=>setShowCreditCards(false)} creditCards={creditCards} sym={sym}
         onAdd={c=>setCreditCards(prev=>[...prev,c])}
         onDelete={id=>setCreditCards(prev=>prev.filter(c=>c.id!==id))}
@@ -1463,17 +1527,7 @@ export default function DayPay() {
               <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Streak</div>
               <div style={{fontSize:"38px",fontWeight:"700",color:streak>0?"#FBBF24":"rgba(255,255,255,0.2)",fontFamily:"'Cormorant Garamond',serif",lineHeight:1,marginBottom:"4px"}}>{streak}</div>
               <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)"}}>{streak===1?"day":"days"} under budget</div>
-              {streakHistory.length>0&&(
-                <div style={{marginTop:"8px",paddingTop:"8px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                  <div style={{fontSize:"10px",color:"rgba(255,255,255,0.25)",marginBottom:"4px"}}>Previous</div>
-                  {streakHistory.slice(0,3).map((h,i)=>(
-                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"2px"}}>
-                      <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)"}}>{h.label}</div>
-                      <div style={{fontSize:"11px",color:"#FBBF24",fontWeight:"600"}}>{h.streak}d</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+
               {balanceAdjustedToday&&(
                 <div style={{fontSize:"10px",color:"rgba(251,191,36,0.5)",marginTop:"6px",lineHeight:1.6}}>
                   Balance updated today<br/>Streak paused · No savings added
@@ -1504,30 +1558,7 @@ export default function DayPay() {
           </div>
 
           {/* Pot history */}
-          {(potHistory.length>0||potHistoryLog.length>0)&&(
-            <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"20px",padding:"16px",marginBottom:"10px"}}>
-              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Savings History</div>
-              {/* This period daily entries */}
-              {potHistory.slice(0,5).map((h,i)=>(
-                <div key={`d${i}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                  <div style={{fontSize:"12px",color:"rgba(255,255,255,0.5)"}}>{longDate(h.date)}</div>
-                  <div style={{fontSize:"12px",color:"#34D399",fontWeight:"600"}}>+{sym}{h.amount.toFixed(2)}</div>
-                </div>
-              ))}
-              {/* Previous pay periods */}
-              {potHistoryLog.length>0&&(
-                <>
-                  <div style={{fontSize:"10px",color:"rgba(255,255,255,0.2)",letterSpacing:"1.5px",textTransform:"uppercase",margin:"8px 0 6px"}}>Previous periods</div>
-                  {potHistoryLog.slice(0,6).map((h,i)=>(
-                    <div key={`p${i}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<Math.min(potHistoryLog.length,6)-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
-                      <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)"}}>{h.label}</div>
-                      <div style={{fontSize:"12px",color:"#34D399",fontWeight:"600"}}>{sym}{h.amount.toFixed(2)}</div>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          )}
+
         </>
       )}
 
