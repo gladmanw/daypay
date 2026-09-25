@@ -590,6 +590,7 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHi
   const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
   const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
   const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
+  const [tab, setTab] = React.useState("spending");
 
   if (!open) return null;
   const grouped = {};
