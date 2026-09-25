@@ -142,234 +142,8 @@ function saveAll(data) {
 }
 
 // ─── Trophies ─────────────────────────────────────────────────────────────────
-const TROPHIES = [
-  { id:"first_win",    icon:"🥉", name:"First Win",          desc:"Stay under budget for the first time",   condition:s=>s.totalWins>=1 },
-  { id:"three_streak", icon:"🔥", name:"On Fire",            desc:"3-day streak under budget",              condition:s=>s.streak>=3 },
-  { id:"seven_streak", icon:"⚡", name:"Lightning Saver",    desc:"7-day streak under budget",              condition:s=>s.streak>=7 },
-  { id:"half_budget",  icon:"🎯", name:"Sharp Shooter",      desc:"Spend less than half your daily budget", condition:s=>s.lastRatio<=0.5&&s.totalWins>=1 },
-  { id:"perfect_ten",  icon:"💎", name:"Diamond Discipline", desc:"10 total days under budget",             condition:s=>s.totalWins>=10 },
-  { id:"big_saver",    icon:"🏆", name:"Big Saver",          desc:"Save over 50% of your daily budget",     condition:s=>s.lastRatio<=0.5&&s.lastSaving>0 },
-];
-
-// ─── Confetti ─────────────────────────────────────────────────────────────────
-function Confetti({ active }) {
-  if (!active) return null;
-  return (
-    <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:200,overflow:"hidden"}}>
-      {Array.from({length:32}).map((_,i)=>(
-        <div key={i} style={{
-          position:"absolute",left:`${Math.random()*100}%`,top:"-10px",
-          width:`${5+Math.random()*6}px`,height:`${8+Math.random()*8}px`,
-          background:["#FFD700","#FF6B6B","#4ECDC4","#A78BFA","#34D399","#F472B6"][i%6],
-          borderRadius:"2px",
-          animation:`fall ${1.5+Math.random()*2}s ease-in forwards`,
-          animationDelay:`${Math.random()*0.8}s`,
-          transform:`rotate(${Math.random()*360}deg)`,
-        }}/>
-      ))}
-    </div>
-  );
-}
-
-// ─── Trophy Toast ─────────────────────────────────────────────────────────────
-function TrophyToast({ trophy, onClose }) {
-  useEffect(()=>{
-    if(trophy){ const t=setTimeout(onClose,3500); return ()=>clearTimeout(t); }
-  },[trophy]);
-  if(!trophy) return null;
-  return (
-    <div style={{
-      position:"fixed",bottom:"24px",left:"50%",transform:"translateX(-50%)",
-      background:"linear-gradient(135deg,#1c1c3a,#0f1629)",
-      border:"1px solid rgba(255,215,0,0.4)",borderRadius:"20px",
-      padding:"14px 20px",display:"flex",alignItems:"center",gap:"12px",
-      zIndex:300,boxShadow:"0 8px 40px rgba(255,215,0,0.15),0 4px 20px rgba(0,0,0,0.5)",
-      animation:"slideToast 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-      maxWidth:"340px",width:"calc(100vw - 48px)"
-    }}>
-      <span style={{fontSize:"32px",filter:"drop-shadow(0 0 10px rgba(255,215,0,0.6))"}}>{trophy.icon}</span>
-      <div>
-        <div style={{fontSize:"10px",color:"#FFD700",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"2px"}}>Trophy Unlocked</div>
-        <div style={{color:"#fff",fontWeight:"700",fontSize:"15px"}}>{trophy.name}</div>
-        <div style={{color:"rgba(255,255,255,0.5)",fontSize:"12px"}}>{trophy.desc}</div>
-      </div>
-      <button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"18px",cursor:"pointer",padding:"0 4px",flexShrink:0}}>×</button>
-    </div>
-  );
-}
 
 
-// ─── Custom Trophy Creator ────────────────────────────────────────────────────
-const TROPHY_EMOJIS = ["⭐","🌟","💫","🎖️","🥇","🥈","🥉","🏅","🎯","🎪","🚀","💪","🔥","⚡","💎","👑","🦁","🐯","🦊","🐺","🌈","☀️","🍀","🌸","🎵","🎸","🍕","🏋️","🧘","🤸","🏃","🚴"];
-
-const CUSTOM_CONDITIONS = [
-  { id:"under_budget_days",  label:"Stay under budget X days in a row", hasValue:true,  unit:"days",    desc:(v)=>`${v}-day streak under budget` },
-  { id:"spend_less_than",    label:"Spend less than a set amount in a day", hasValue:true, unit:"amount", desc:(v,sym)=>`Spend less than ${sym}${v} in a day` },
-  { id:"spend_pct_of_budget",label:"Spend less than X% of daily budget", hasValue:true,  unit:"%",      desc:(v)=>`Spend less than ${v}% of daily budget` },
-  { id:"total_wins",         label:"Reach X total days under budget",    hasValue:true,  unit:"days",    desc:(v)=>`${v} total days under budget` },
-  { id:"save_amount",        label:"Save more than a set amount in a day", hasValue:true, unit:"amount", desc:(v,sym)=>`Save more than ${sym}${v} in one day` },
-  { id:"log_expenses",       label:"Log more than X expenses in a day",  hasValue:true,  unit:"expenses",desc:(v)=>`Log ${v}+ expenses in a day` },
-];
-
-function checkCustomTrophy(trophy, stats, sym) {
-  const v = parseFloat(trophy.conditionValue) || 0;
-  switch(trophy.conditionId) {
-    case "under_budget_days":   return stats.streak >= v;
-    case "spend_less_than":     return stats.todaySpent < v && stats.totalWins >= 1;
-    case "spend_pct_of_budget": return stats.lastRatio * 100 <= v && stats.totalWins >= 1;
-    case "total_wins":          return stats.totalWins >= v;
-    case "save_amount":         return stats.lastSaving >= v;
-    case "log_expenses":        return stats.todayExpenseCount >= v;
-    default: return false;
-  }
-}
-
-function CreateTrophyModal({ open, onClose, onSave, sym }) {
-  const [step,      setStep]      = useState(0); // 0=icon, 1=name, 2=condition
-  const [icon,      setIcon]      = useState("⭐");
-  const [name,      setName]      = useState("");
-  const [condId,    setCondId]    = useState("under_budget_days");
-  const [condValue, setCondValue] = useState("3");
-
-  const reset = () => { setStep(0); setIcon("⭐"); setName(""); setCondId("under_budget_days"); setCondValue("3"); };
-  const cond  = CUSTOM_CONDITIONS.find(c=>c.id===condId);
-  const desc  = cond ? cond.desc(condValue, sym) : "";
-  const canSave = name.trim().length > 0 && condValue;
-
-  if (!open) return null;
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(6,6,18,0.92)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:260,backdropFilter:"blur(10px)"}}>
-      <div style={{
-        background:"linear-gradient(180deg,#111827,#0d1117)",
-        borderRadius:"28px 28px 0 0",padding:"0 0 48px",
-        width:"100%",maxWidth:"420px",maxHeight:"90vh",overflowY:"auto",
-        animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"
-      }}>
-        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
-          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.2)"}}/>
-        </div>
-        <div style={{padding:"0 24px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>Create Trophy</div>
-            <button onClick={()=>{reset();onClose();}} style={{background:"rgba(255,255,255,0.06)",border:"none",borderRadius:"10px",padding:"8px 12px",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:"14px"}}>Cancel</button>
-          </div>
-
-          {/* Step dots */}
-          <div style={{display:"flex",gap:"6px",marginBottom:"24px"}}>
-            {["Icon","Name","Condition"].map((s,i)=>(
-              <div key={i} style={{flex:1}}>
-                <div style={{height:"3px",borderRadius:"2px",background:i<=step?"#A78BFA":"rgba(255,255,255,0.1)",transition:"background 0.3s"}}/>
-                <div style={{fontSize:"9px",color:i===step?"#A78BFA":"rgba(255,255,255,0.25)",marginTop:"4px",textAlign:"center"}}>{s}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Step 0 — Pick icon */}
-          {step===0&&(
-            <div style={{animation:"slideUp 0.3s ease"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"12px"}}>Pick an icon</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:"8px",marginBottom:"24px",maxHeight:"240px",overflowY:"auto"}}>
-                {TROPHY_EMOJIS.map(e=>(
-                  <button key={e} onClick={()=>setIcon(e)} style={{
-                    padding:"12px 4px",borderRadius:"12px",border:"none",fontSize:"24px",
-                    background:icon===e?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.04)",
-                    border:`1px solid ${icon===e?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.06)"}`,
-                    cursor:"pointer",transition:"all 0.15s"
-                  }}>{e}</button>
-                ))}
-              </div>
-              <div style={{background:"rgba(255,255,255,0.04)",borderRadius:"16px",padding:"16px",textAlign:"center",marginBottom:"20px"}}>
-                <div style={{fontSize:"52px",marginBottom:"6px"}}>{icon}</div>
-                <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>Your trophy icon</div>
-              </div>
-              <button onClick={()=>setStep(1)} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:"pointer"}}>Next →</button>
-            </div>
-          )}
-
-          {/* Step 1 — Name */}
-          {step===1&&(
-            <div style={{animation:"slideUp 0.3s ease"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>Name your trophy</div>
-              <div style={{textAlign:"center",marginBottom:"20px"}}>
-                <div style={{fontSize:"52px",marginBottom:"6px"}}>{icon}</div>
-              </div>
-              <input
-                autoFocus
-                placeholder="e.g. Weekend Warrior"
-                value={name}
-                onChange={e=>setName(e.target.value)}
-                maxLength={30}
-                style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"14px",padding:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"18px",outline:"none",marginBottom:"8px",boxSizing:"border-box",textAlign:"center"}}
-              />
-              <div style={{fontSize:"12px",color:"rgba(255,255,255,0.25)",textAlign:"right",marginBottom:"20px"}}>{name.length}/30</div>
-              <div style={{display:"flex",gap:"10px"}}>
-                <button onClick={()=>setStep(0)} style={{padding:"16px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"16px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>←</button>
-                <button onClick={()=>{if(name.trim())setStep(2);}} disabled={!name.trim()} style={{flex:1,padding:"16px",background:name.trim()?"linear-gradient(135deg,#A78BFA,#7C3AED)":"rgba(255,255,255,0.05)",border:"none",borderRadius:"16px",color:name.trim()?"#fff":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:name.trim()?"pointer":"default"}}>Next →</button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2 — Condition */}
-          {step===2&&(
-            <div style={{animation:"slideUp 0.3s ease"}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>How do you earn it?</div>
-
-              <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"16px"}}>
-                {CUSTOM_CONDITIONS.map(c=>(
-                  <button key={c.id} onClick={()=>setCondId(c.id)} style={{
-                    padding:"14px 16px",borderRadius:"14px",border:"none",textAlign:"left",
-                    background:condId===c.id?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",
-                    border:`1px solid ${condId===c.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.07)"}`,
-                    color:condId===c.id?"#34D399":"rgba(255,255,255,0.55)",
-                    fontFamily:"'DM Sans',sans-serif",fontSize:"13px",fontWeight:"600",cursor:"pointer"
-                  }}>{c.label}</button>
-                ))}
-              </div>
-
-              {/* Value input */}
-              {cond?.hasValue&&(
-                <div style={{marginBottom:"16px"}}>
-                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>
-                    {cond.unit==="amount"?`Amount (${sym})`:cond.unit==="%" ? "Percentage" : cond.unit==="days"?"Number of days":"Number"}
-                  </div>
-                  <input
-                    type="number"
-                    value={condValue}
-                    onChange={e=>setCondValue(e.target.value)}
-                    style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px 16px",color:"#fff",fontFamily:"'Cormorant Garamond',serif",fontSize:"28px",fontWeight:"700",outline:"none",boxSizing:"border-box",textAlign:"center"}}
-                  />
-                </div>
-              )}
-
-              {/* Preview */}
-              <div style={{background:"rgba(255,215,0,0.07)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:"14px",padding:"14px 16px",marginBottom:"20px",display:"flex",alignItems:"center",gap:"12px"}}>
-                <span style={{fontSize:"28px"}}>{icon}</span>
-                <div>
-                  <div style={{fontWeight:"700",color:"#fff",fontSize:"15px"}}>{name}</div>
-                  <div style={{fontSize:"12px",color:"rgba(255,255,255,0.5)",marginTop:"2px"}}>{desc}</div>
-                </div>
-              </div>
-
-              <div style={{display:"flex",gap:"10px"}}>
-                <button onClick={()=>setStep(1)} style={{padding:"16px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"16px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>←</button>
-                <button onClick={()=>{
-                  if(canSave){
-                    onSave({id:`custom_${Date.now()}`,icon,name:name.trim(),desc,conditionId:condId,conditionValue:condValue,custom:true});
-                    reset();
-                    onClose();
-                  }
-                }} disabled={!canSave} style={{flex:1,padding:"16px",background:canSave?"linear-gradient(135deg,#FFD700,#F59E0B)":"rgba(255,255,255,0.05)",border:"none",borderRadius:"16px",color:canSave?"#111":"rgba(255,255,255,0.2)",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:canSave?"pointer":"default",boxShadow:canSave?"0 6px 24px rgba(255,215,0,0.25)":"none"}}>
-                  Create Trophy ✨
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── NumPad ───────────────────────────────────────────────────────────────────
 function NumPad({ onKey }) {
@@ -609,6 +383,90 @@ function PayScheduleBuilder({ payConfig, onChange, sym }) {
   );
 }
 
+
+// ─── Credit Card Sheet ────────────────────────────────────────────────────────
+function CreditCardSheet({ open, onClose, creditCards, onAdd, onDelete, onUpdate, sym }) {
+  const [translateY, setTranslateY] = React.useState(0);
+  const startY = React.useRef(null);
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
+  const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
+
+  const [name, setName] = useState("");
+  const [balance, setBalance] = useState("");
+
+  if(!open) return null;
+
+  const handleAdd = () => {
+    if(!name.trim()) return;
+    onAdd({ id:`card_${Date.now()}`, name:name.trim(), balance:parseFloat(balance)||0, type:"credit" });
+    setName(""); setBalance("");
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
+      <div
+        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"88vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      >
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
+        </div>
+        <div style={{padding:"0 24px"}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"6px"}}>Credit Cards</div>
+          <div style={{fontSize:"13px",color:"rgba(255,255,255,0.35)",marginBottom:"20px"}}>Track what you owe. Card spending won't affect your daily budget.</div>
+
+          {/* Add card */}
+          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"18px",padding:"16px",marginBottom:"20px"}}>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Add Card</div>
+            <input placeholder="Card name (e.g. Amex, Barclaycard)" value={name} onChange={e=>setName(e.target.value)}
+              style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 14px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",marginBottom:"10px",boxSizing:"border-box"}}/>
+            <div style={{position:"relative",marginBottom:"10px"}}>
+              <span style={{position:"absolute",left:"12px",top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,0.3)",fontSize:"15px"}}>{sym}</span>
+              <input type="number" placeholder="Balance owed" value={balance} onChange={e=>setBalance(e.target.value)}
+                style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 12px 12px 28px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <button onClick={handleAdd} disabled={!name.trim()} style={{
+              width:"100%",padding:"13px",
+              background:name.trim()?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",
+              border:name.trim()?"1px solid rgba(167,139,250,0.3)":"1px solid rgba(255,255,255,0.07)",
+              borderRadius:"12px",color:name.trim()?"#A78BFA":"rgba(255,255,255,0.2)",
+              fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"14px",cursor:"pointer"
+            }}>+ Add Card</button>
+          </div>
+
+          {/* Card list */}
+          {creditCards.length===0 ? (
+            <div style={{textAlign:"center",padding:"24px 0",color:"rgba(255,255,255,0.25)",fontSize:"13px"}}>No cards added yet</div>
+          ) : creditCards.map(card=>(
+            <div key={card.id} style={{background:"rgba(248,113,113,0.05)",border:"1px solid rgba(248,113,113,0.15)",borderRadius:"16px",padding:"14px 16px",marginBottom:"10px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                  <span style={{fontSize:"22px"}}>💳</span>
+                  <div>
+                    <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{card.name}</div>
+                    <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",marginTop:"1px"}}>Credit Card</div>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:"18px",fontWeight:"700",color:"#F87171",fontFamily:"'Cormorant Garamond',serif"}}>Owed {sym}{card.balance.toFixed(2)}</div>
+                  <button onClick={()=>onDelete(card.id)} style={{background:"rgba(248,113,113,0.1)",border:"none",borderRadius:"8px",padding:"4px 10px",color:"#F87171",fontFamily:"'DM Sans',sans-serif",fontSize:"11px",cursor:"pointer",fontWeight:"600",marginTop:"6px"}}>Remove</button>
+                </div>
+              </div>
+              <div style={{marginTop:"10px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.05)",display:"flex",gap:"8px",alignItems:"center"}}>
+                <input type="number" placeholder="Update balance owed" onBlur={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))onUpdate(card.id,v);e.target.value="";}}
+                  style={{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"13px",outline:"none"}}/>
+                <span style={{fontSize:"12px",color:"rgba(255,255,255,0.3)"}}>Update</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Recurring Bills Sheet ────────────────────────────────────────────────────
 const BILL_FREQUENCIES = [
   { id:"daily",   label:"Daily" },
@@ -690,21 +548,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
               </div>
             )}
             {/* Account selector */}
-            {accounts&&accounts.length>0&&(
-              <div style={{marginBottom:"10px"}}>
-                <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"6px"}}>Deduct from</div>
-                <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-                  <button onClick={()=>setBillAccId("main")} style={{padding:"7px 14px",borderRadius:"20px",border:"none",background:billAccId==="main"?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",border:`1px solid ${billAccId==="main"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,color:billAccId==="main"?"#34D399":"rgba(255,255,255,0.45)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
-                    Main Account
-                  </button>
-                  {accounts.map(a=>(
-                    <button key={a.id} onClick={()=>setBillAccId(a.id)} style={{padding:"7px 14px",borderRadius:"20px",border:"none",background:billAccId===a.id?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.05)",border:`1px solid ${billAccId===a.id?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.08)"}`,color:billAccId===a.id?"#A78BFA":"rgba(255,255,255,0.45)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>
-                      {a.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+
             <button onClick={handleAdd} disabled={!name.trim()||!parseFloat(amount)} style={{
               width:"100%",padding:"13px",
               background:name.trim()&&parseFloat(amount)?"rgba(248,113,113,0.15)":"rgba(255,255,255,0.04)",
@@ -722,7 +566,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
               <div>
                 <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{b.name}</div>
                 <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>
-                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:""} · {b.accountId==="main"||!b.accountId?"Main Account":(accounts?.find(a=>a.id===b.accountId)?.name||"Main Account")}
+                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:""}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
@@ -731,115 +575,6 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
               </div>
             </div>
           ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Secondary Accounts Sheet ─────────────────────────────────────────────────
-function AccountsSheet({ open, onClose, accounts, onAdd, onDelete, onUpdate, sym, activeAccount, onSetActive }) {
-  const [translateY, setTranslateY] = React.useState(0);
-  const startY = React.useRef(null);
-  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
-  const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
-  const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
-
-  const [name,    setName]    = useState("");
-  const [balance, setBalance] = useState("");
-  const [type,    setType]    = useState("savings");
-
-  if (!open) return null;
-
-  const TYPES = [
-    { id:"savings",     label:"Bank Account", icon:"🏦" },
-    { id:"credit",      label:"Credit Card",  icon:"💳" },
-    { id:"cash",        label:"Cash",         icon:"💵" },
-  ];
-
-  const handleAdd = () => {
-    const bal = parseFloat(balance);
-    if (!name.trim()) return;
-    onAdd({ id:`acc_${Date.now()}`, name:name.trim(), balance:bal||0, type });
-    setName(""); setBalance(""); setType("savings");
-  };
-
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
-      <div
-        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"88vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
-        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-      >
-        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
-          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
-        </div>
-        <div style={{padding:"0 24px"}}>
-          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff",marginBottom:"6px"}}>Accounts</div>
-          <div style={{fontSize:"13px",color:"rgba(255,255,255,0.35)",marginBottom:"20px"}}>Track savings, credit cards and other accounts alongside your main budget.</div>
-
-          {/* Add account */}
-          <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"18px",padding:"16px",marginBottom:"20px"}}>
-            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Add Account</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"10px"}}>
-              {TYPES.map(t=>(
-                <button key={t.id} onClick={()=>setType(t.id)} style={{padding:"10px 4px",borderRadius:"10px",border:`1px solid ${type===t.id?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.07)"}`,background:type===t.id?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",color:type===t.id?"#A78BFA":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"11px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
-                  <span>{t.icon}</span><span style={{fontWeight:"600"}}>{t.label}</span>
-                </button>
-              ))}
-            </div>
-            <input placeholder="Account name" value={name} onChange={e=>setName(e.target.value)}
-              style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 14px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",marginBottom:"10px",boxSizing:"border-box"}}/>
-            <div style={{position:"relative",marginBottom:"10px"}}>
-              <span style={{position:"absolute",left:"12px",top:"50%",transform:"translateY(-50%)",color:"rgba(255,255,255,0.3)",fontSize:"15px"}}>{sym}</span>
-              <input type="number" placeholder={type==="credit"?"Balance owed":"Current balance"} value={balance} onChange={e=>setBalance(e.target.value)}
-                style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px 12px 12px 28px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",boxSizing:"border-box"}}/>
-            </div>
-            <button onClick={handleAdd} disabled={!name.trim()} style={{
-              width:"100%",padding:"13px",
-              background:name.trim()?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",
-              border:name.trim()?"1px solid rgba(167,139,250,0.3)":"1px solid rgba(255,255,255,0.07)",
-              borderRadius:"12px",color:name.trim()?"#A78BFA":"rgba(255,255,255,0.2)",
-              fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"14px",cursor:"pointer"
-            }}>+ Add Account</button>
-          </div>
-
-          {/* Account list */}
-          {accounts.length===0 ? (
-            <div style={{textAlign:"center",padding:"24px 0",color:"rgba(255,255,255,0.25)",fontSize:"13px"}}>No accounts added yet</div>
-          ) : accounts.map(acc=>{
-            const typeInfo = TYPES.find(t=>t.id===acc.type)||TYPES[0];
-            const isActive = activeAccount===acc.id;
-            const isCredit = acc.type==="credit";
-            return (
-              <div key={acc.id} style={{background:isActive?"rgba(167,139,250,0.08)":"rgba(255,255,255,0.02)",border:`1px solid ${isActive?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.06)"}`,borderRadius:"16px",padding:"14px 16px",marginBottom:"10px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-                    <span style={{fontSize:"22px"}}>{typeInfo.icon}</span>
-                    <div>
-                      <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{acc.name}</div>
-                      <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",marginTop:"1px"}}>{typeInfo.label}</div>
-                    </div>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:"18px",fontWeight:"700",color:isCredit?"#F87171":"#34D399",fontFamily:"'Cormorant Garamond',serif"}}>{isCredit?"-":""}{sym}{acc.balance.toFixed(2)}</div>
-                    <div style={{display:"flex",gap:"6px",marginTop:"6px",justifyContent:"flex-end"}}>
-                      <button onClick={()=>onSetActive(isActive?null:acc.id)} style={{background:isActive?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.06)",border:`1px solid ${isActive?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:"8px",padding:"4px 10px",color:isActive?"#A78BFA":"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontSize:"11px",cursor:"pointer",fontWeight:"600"}}>
-                        {isActive?"Active":"Set Active"}
-                      </button>
-                      <button onClick={()=>onDelete(acc.id)} style={{background:"rgba(248,113,113,0.1)",border:"none",borderRadius:"8px",width:"26px",height:"26px",color:"#F87171",cursor:"pointer",fontSize:"14px",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-                    </div>
-                  </div>
-                </div>
-                {/* Inline balance update */}
-                <div style={{marginTop:"10px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.05)",display:"flex",gap:"8px",alignItems:"center"}}>
-                  <input type="number" placeholder="Update balance" onBlur={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))onUpdate(acc.id,v);e.target.value="";}}
-                    style={{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"8px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"13px",outline:"none"}}/>
-                  <span style={{fontSize:"12px",color:"rgba(255,255,255,0.3)"}}>Update</span>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>
@@ -930,94 +665,6 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins }) {
   );
 }
 
-// ─── Trophies Sheet ───────────────────────────────────────────────────────────
-function TrophiesSheet({ open, onClose, unlocked, allTimeTrophies, customTrophies, onCreateTrophy, onDeleteCustom }) {
-  const [translateY, setTranslateY] = React.useState(0);
-  const startY = React.useRef(null);
-
-  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
-  const handleTouchMove  = (e) => {
-    const dy = e.touches[0].clientY - startY.current;
-    if (dy > 0) setTranslateY(dy);
-  };
-  const handleTouchEnd   = () => {
-    if (translateY > 80) { setTranslateY(0); onClose(); }
-    else setTranslateY(0);
-  };
-
-  if (!open) return null;
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
-      <div
-        style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",maxHeight:"85vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)",transform:`translateY(${translateY}px)`,transition:translateY===0?"transform 0.3s ease":"none"}}
-        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-      >
-        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px",cursor:"grab"}}>
-          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
-        </div>
-        <div style={{padding:"0 24px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>Trophies</div>
-            <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>{unlocked.length}/{TROPHIES.length} this period</div>
-          </div>
-          {allTimeTrophies>0&&<div style={{fontSize:"12px",color:"#FFD700",marginBottom:"20px"}}>🏅 {allTimeTrophies} earned all time</div>}
-          {/* Built-in trophies */}
-          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Built-in</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"20px"}}>
-            {TROPHIES.map(t=>{
-              const got=unlocked.includes(t.id);
-              return (
-                <div key={t.id} style={{background:got?"rgba(255,215,0,0.07)":"rgba(255,255,255,0.025)",border:`1px solid ${got?"rgba(255,215,0,0.2)":"rgba(255,255,255,0.06)"}`,borderRadius:"18px",padding:"18px 12px",textAlign:"center",filter:got?"none":"grayscale(1) opacity(0.3)"}}>
-                  <div style={{fontSize:"36px",marginBottom:"8px"}}>{t.icon}</div>
-                  <div style={{fontWeight:"700",fontSize:"13px",color:"#fff",marginBottom:"4px"}}>{t.name}</div>
-                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.38)",lineHeight:1.4}}>{t.desc}</div>
-                  {got&&<div style={{marginTop:"6px",fontSize:"10px",color:"#FFD700",letterSpacing:"1px"}}>✓ UNLOCKED</div>}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Custom trophies */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
-            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",letterSpacing:"2px",textTransform:"uppercase"}}>Custom</div>
-            <button onClick={onCreateTrophy} style={{background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"20px",padding:"5px 12px",color:"#A78BFA",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600",cursor:"pointer"}}>+ Create</button>
-          </div>
-          {customTrophies?.length===0&&(
-            <div style={{textAlign:"center",padding:"20px",background:"rgba(255,255,255,0.02)",borderRadius:"14px",marginBottom:"16px"}}>
-              <div style={{fontSize:"24px",marginBottom:"6px",opacity:0.3}}>✨</div>
-              <div style={{fontSize:"12px",color:"rgba(255,255,255,0.25)"}}>No custom trophies yet</div>
-            </div>
-          )}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"16px"}}>
-            {(customTrophies||[]).map(t=>{
-              const got=unlocked.includes(t.id);
-              return (
-                <div key={t.id} style={{background:got?"rgba(255,215,0,0.07)":"rgba(255,255,255,0.025)",border:`1px solid ${got?"rgba(255,215,0,0.2)":"rgba(167,139,250,0.15)"}`,borderRadius:"18px",padding:"16px 12px",textAlign:"center",filter:got?"none":"opacity(0.6)",position:"relative"}}>
-                  <button onClick={()=>onDeleteCustom(t.id)} style={{position:"absolute",top:"8px",right:"8px",background:"rgba(248,113,113,0.15)",border:"none",borderRadius:"6px",width:"20px",height:"20px",color:"#F87171",cursor:"pointer",fontSize:"12px",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>×</button>
-                  <div style={{fontSize:"32px",marginBottom:"8px"}}>{t.icon}</div>
-                  <div style={{fontWeight:"700",fontSize:"13px",color:"#fff",marginBottom:"4px"}}>{t.name}</div>
-                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.38)",lineHeight:1.4}}>{typeof t.desc==="function"?t.desc():t.desc}</div>
-                  {got&&<div style={{marginTop:"6px",fontSize:"10px",color:"#FFD700",letterSpacing:"1px"}}>✓ UNLOCKED</div>}
-                  <div style={{marginTop:"4px",fontSize:"9px",color:"rgba(167,139,250,0.5)",letterSpacing:"0.5px"}}>CUSTOM</div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{background:"rgba(167,139,250,0.05)",border:"1px dashed rgba(167,139,250,0.18)",borderRadius:"14px",padding:"16px",textAlign:"center"}}>
-            <div style={{fontSize:"20px",marginBottom:"6px"}}>🎟️</div>
-            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",lineHeight:1.6}}>
-              <span style={{color:"#A78BFA",fontWeight:"600"}}>Sponsor coupon codes</span><br/>coming soon
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Settings Sheet ───────────────────────────────────────────────────────────
-
 // ─── FAQ Components ───────────────────────────────────────────────────────────
 const FAQ_ITEMS = [
   {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day by dividing your current balance by the number of days until payday. It's locked for the entire day so you always have a consistent target to aim for."},
@@ -1030,7 +677,8 @@ const FAQ_ITEMS = [
   {q:"What are recurring bills?", a:"Bills are regular payments like Netflix or rent. Add them in the Bills section and they'll automatically create an expense and deduct from your account on their due date. The Bills icon shows a red badge counting how many are coming up this month."},
   {q:"When does my day reset?", a:"At midnight your day closes automatically. Your current balance is updated, a summary appears when you next open the app, and a fresh daily budget is calculated for the new day."},
   {q:"How do I update my current balance?", a:"Go to Settings and update the Current Balance field. When you save, the app works backwards so that the number you type is exactly what shows on the main screen — your existing transactions stay intact."},
-  {q:"How do trophies work?", a:"Trophies are earned by hitting spending goals — like staying under budget for several days in a row or spending less than 50% of your daily budget. They reset each pay period but your all-time count is saved. You can also create custom trophies with your own rules."},
+  {q:"How does the streak work?", a:"Your streak counts consecutive days you stayed under budget without manually adjusting your balance. If you update your balance in Settings on a given day, that day won't extend the streak — but it won't break it either. Only a day over budget resets it to zero."},
+  {q:"How does the savings pot work?", a:"Every day you close under budget, the amount you saved (daily budget minus spending) gets added to your savings pot. It resets each pay period, but you can see your pot history to track how much you've saved over time. Set a goal and watch the bar fill up."},
 ];
 
 function FaqItem({ item }) {
@@ -1308,36 +956,32 @@ export default function DayPay() {
   const [expenses,        setExpenses]        = useState(saved?.expenses        ?? []);
   const [label,           setLabel]           = useState("");
   const [history,         setHistory]         = useState(saved?.history         ?? []);
-  const [unlocked,        setUnlocked]        = useState(saved?.unlocked        ?? []);
-  const [allTimeTrophies, setAllTimeTrophies] = useState(saved?.allTimeTrophies ?? 0);
-  const [newTrophy,       setNewTrophy]       = useState(null);
-  const [confetti,        setConfetti]        = useState(false);
-  const [showCalc,        setShowCalc]        = useState(false);
-  const [isIncome,        setIsIncome]        = useState(false);
-  const [incomeDestination,setIncomeDestination]= useState("main"); // "main" or account id
+  const [showCalc,           setShowCalc]           = useState(false);
+  const [isIncome,           setIsIncome]           = useState(false);
+  const [incomeDestination,  setIncomeDestination]  = useState("main");
   const [incomeDeductBalance,setIncomeDeductBalance]= useState(true);
-  const [showTransactions,setShowTransactions]= useState(false);
-  const [showSettings,    setShowSettings]    = useState(false);
-  const [showHistory,     setShowHistory]     = useState(false);
-  const [showTrophies,    setShowTrophies]    = useState(false);
-  const [daySummary,      setDaySummary]      = useState(saved?.pendingSummary  ?? null);
-  const [paydayModal,     setPaydayModal]     = useState(saved?.pendingPayday   ?? null);
-  const [lastClosedDate,  setLastClosedDate]  = useState(saved?.lastClosedDate  ?? todayISO());
-  const [showBudgetTip,   setShowBudgetTip]   = useState(false);
-  const [lockedDailyBudget,setLockedDailyBudget]= useState(saved?.lockedDailyBudget ?? null);
-  const [customTrophies,  setCustomTrophies]  = useState(saved?.customTrophies  ?? []);
-  const [showCreateTrophy,setShowCreateTrophy]= useState(false);
-  const [bills,           setBills]           = useState(saved?.bills           ?? []);
-  const [accounts,        setAccounts]        = useState(saved?.accounts        ?? []);
-  const [activeAccount,   setActiveAccount]   = useState(saved?.activeAccount   ?? null);
-  const [showBills,       setShowBills]       = useState(false);
-  const [showAccounts,    setShowAccounts]    = useState(false);
+  const [showTransactions,   setShowTransactions]   = useState(false);
+  const [showSettings,       setShowSettings]       = useState(false);
+  const [showHistory,        setShowHistory]        = useState(false);
+  const [daySummary,         setDaySummary]         = useState(saved?.pendingSummary  ?? null);
+  const [paydayModal,        setPaydayModal]        = useState(saved?.pendingPayday   ?? null);
+  const [lastClosedDate,     setLastClosedDate]     = useState(saved?.lastClosedDate  ?? todayISO());
+  const [showBudgetTip,      setShowBudgetTip]      = useState(false);
+  const [lockedDailyBudget,  setLockedDailyBudget]  = useState(saved?.lockedDailyBudget ?? null);
+  const [bills,              setBills]              = useState(saved?.bills              ?? []);
+  const [creditCards,        setCreditCards]        = useState(saved?.creditCards        ?? []);
+  const [showBills,          setShowBills]          = useState(false);
+  const [showCreditCards,    setShowCreditCards]    = useState(false);
+  const [savingsPot,         setSavingsPot]         = useState(saved?.savingsPot         ?? 0);
+  const [potGoal,            setPotGoal]            = useState(saved?.potGoal            ?? 200);
+  const [potHistory,         setPotHistory]         = useState(saved?.potHistory         ?? []);
+  const [balanceAdjustedToday,setBalanceAdjustedToday]= useState(saved?.balanceAdjustedToday ?? false);
   const labelRef = useRef(null);
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,unlocked,allTimeTrophies,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,customTrophies,bills,accounts,activeAccount,lockedDailyBudget});
-  },[setup,expenses,history,unlocked,allTimeTrophies,daySummary,paydayModal,lastClosedDate,customTrophies,bills,accounts,activeAccount]);
+    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday});
+  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday]);
 
   // On app open — check if day has changed
   useEffect(()=>{
@@ -1405,7 +1049,7 @@ export default function DayPay() {
     const spent = allEx.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((t,e)=>t+e.amount,0);
     const isUnder = spent < daily;
 
-    const summary = {date:dateStr, spent, budget:daily, under:isUnder, expenses:allEx};
+    const summary = {date:dateStr, spent, budget:daily, under:isUnder, expenses:allEx, adjusted:stored.balanceAdjustedToday??false};
 
     // Update history
     setHistory(prev=>[...prev,summary]);
@@ -1427,8 +1071,9 @@ export default function DayPay() {
       setSetup(prev=>({...prev,currentBalance:suggested,nextPayday:newNextPayday}));
       setPaydayModal({suggestedBalance:suggested});
       // Reset trophies
-      setAllTimeTrophies(prev=>prev+unlocked.length);
-      setUnlocked([]);
+      // trophies removed — pot resets each pay period
+      setSavingsPot(0);
+      setPotHistory([]);
     } else {
       setSetup(prev=>({...prev,currentBalance:newBalance}));
       // Deduct any bills assigned to secondary accounts
@@ -1441,38 +1086,19 @@ export default function DayPay() {
       }
     }
 
-    // Trophy check
-    const newStreak = isUnder ? (stored.history?.filter(h=>h.under).length>=0 ? (() => { let s2=0; const h=[...(stored.history??[]),summary]; for(let i=h.length-1;i>=0;i--){if(h[i].under)s2++;else break;} return s2; })() : 1) : 0;
-    const newWins   = (stored.history??[]).filter(h=>h.under).length + (isUnder?1:0);
-    checkTrophiesInner(stored.unlocked??[], stored.customTrophies??[], {
-      streak:newStreak, totalWins:newWins,
-      lastSaving:Math.max(0,daily-spent),
-      lastRatio:daily>0?spent/daily:1,
-      todaySpent:spent,
-      todayExpenseCount:ex.length
-    });
+    // Savings pot — add today's saving if under budget and no balance adjustment
+    const todaySaving = Math.max(0, daily - spent);
+    const wasAdjusted = stored.balanceAdjustedToday ?? false;
+    if(isUnder && !wasAdjusted && todaySaving > 0){
+      const newPot = parseFloat(((stored.savingsPot ?? 0) + todaySaving).toFixed(2));
+      setSavingsPot(newPot);
+      setPotHistory(prev=>[{date:dateStr, amount:todaySaving}, ...prev].slice(0,30));
+    }
+    // Reset balance adjusted flag for new day
+    setBalanceAdjustedToday(false);
   };
 
-  const checkTrophiesInner = (currentUnlocked, currentCustom, ns) => {
-    // Check built-in trophies
-    TROPHIES.forEach(t=>{
-      if(!currentUnlocked.includes(t.id)&&t.condition(ns)){
-        setUnlocked(prev=>prev.includes(t.id)?prev:[...prev,t.id]);
-        setNewTrophy(t);
-        setConfetti(true);
-        setTimeout(()=>setConfetti(false),3200);
-      }
-    });
-    // Check custom trophies
-    (currentCustom||[]).forEach(t=>{
-      if(!currentUnlocked.includes(t.id)&&checkCustomTrophy(t,ns)){
-        setUnlocked(prev=>prev.includes(t.id)?prev:[...prev,t.id]);
-        setNewTrophy(t);
-        setConfetti(true);
-        setTimeout(()=>setConfetti(false),3200);
-      }
-    });
-  };
+
 
   if(!setup) return (
     <>
@@ -1511,7 +1137,8 @@ export default function DayPay() {
   const pct      = Math.min((effectiveSpent/Math.max(daily,0.01))*100,100);
   const isUnder  = effectiveSpent < daily;
   const barCol   = pct<60?"#34D399":pct<85?"#FBBF24":"#F87171";
-  const streak   = (()=>{ let s=0; for(let i=history.length-1;i>=0;i--){if(history[i].under)s++;else break;} return s; })();
+  const streak   = (()=>{ let s=0; for(let i=history.length-1;i>=0;i--){if(history[i].under&&!history[i].adjusted)s++;else break;} return s; })();
+  const totalWins= history.filter(h=>h.under).length;
 
   // Count bills due this month that haven't passed yet
   const upcomingBillsCount = bills.filter(b => {
@@ -1538,12 +1165,12 @@ export default function DayPay() {
   const handleAddExpense = () => {
     const amt=parseFloat(display);
     if(!amt||amt<=0) return;
-    const acc = activeAccount ? accounts.find(a=>a.id===activeAccount) : null;
-    const isCredit = acc?.type==="credit";
+    const acc = null; // secondary accounts removed — credit cards handled separately
+    const isCredit = false;
 
     if(isIncome){
       // Income: add to chosen destination
-      const destAcc = accounts.find(a=>a.id===incomeDestination);
+      const destAcc = creditCards.find(a=>a.id===incomeDestination);
       if(incomeDestination==="main"){
         setSetup(prev=>({...prev,currentBalance:prev.currentBalance+amt}));
         // Income only affects tomorrow's daily budget — not today's locked value
@@ -1555,10 +1182,9 @@ export default function DayPay() {
           setExpenses(prev=>[...prev,{id:Date.now()+1,label:'Pay '+destAcc.name,amount:amt,account:null,isAutoBalancer:true,linkedCreditCard:destAcc.name}]);
         }
         // Always reduce card balance owed
-        setAccounts(prev=>prev.map(a=>a.id===incomeDestination?{...a,balance:Math.max(0,a.balance-amt)}:a));
+        setCreditCards(prev=>prev.map(c=>c.id===incomeDestination?{...c,balance:Math.max(0,c.balance-amt)}:c));
       } else {
-        // Add to secondary account balance
-        setAccounts(prev=>prev.map(a=>a.id===incomeDestination?{...a,balance:a.balance+amt}:a));
+        // No secondary accounts — credit cards handled above
       }
       const destAccName = destAcc?.name||null;
       const isCreditPayoff = destAcc?.type==="credit";
@@ -1572,7 +1198,7 @@ export default function DayPay() {
         // Regular expense: deducts from daily budget as normal
         setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
         if(acc){
-          setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:Math.max(0,a.balance-amt)}:a));
+          // secondary account deduction removed
         }
       }
     }
@@ -1596,16 +1222,10 @@ export default function DayPay() {
         button:active{transform:scale(0.96)}
       `}</style>
 
-      <Confetti active={confetti}/>
-      <TrophyToast trophy={newTrophy} onClose={()=>setNewTrophy(null)}/>
+
 
       {/* Modals — priority order */}
-      <CreateTrophyModal
-        open={showCreateTrophy}
-        onClose={()=>setShowCreateTrophy(false)}
-        onSave={t=>setCustomTrophies(prev=>[...prev,t])}
-        sym={sym}
-      />
+
 
       {paydayModal && (
         <PaydayModal
@@ -1639,26 +1259,24 @@ export default function DayPay() {
         // So to make front screen show newBalance: currentBalance = newBalance + spent
         const newDisplayBalance = s.currentBalance;
         const trueBase = parseFloat((newDisplayBalance + spent).toFixed(2));
-        // Recalculate and lock the new daily budget based on what user typed
         const newLocked = parseFloat((newDisplayBalance / Math.max(days,1)).toFixed(2));
         setLockedDailyBudget(newLocked);
-        const all = loadAll()||{};
-        saveAll({...all, lockedDailyBudget:newLocked, lockedBudgetDate:todayISO()});
+        setBalanceAdjustedToday(true); // flag so streak doesn't extend today
         setSetup(prev=>({...prev,...s,currentBalance:trueBase,nextPayday:np}));
       }}/>
       <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins}/>
-      <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym} accounts={accounts}
+      <CreditCardSheet open={showCreditCards} onClose={()=>setShowCreditCards(false)} creditCards={creditCards} sym={sym}
+        onAdd={c=>setCreditCards(prev=>[...prev,c])}
+        onDelete={id=>setCreditCards(prev=>prev.filter(c=>c.id!==id))}
+        onUpdate={(id,bal)=>setCreditCards(prev=>prev.map(c=>c.id===id?{...c,balance:bal}:c))}
+      />
+      <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym} accounts={[]}
         onAdd={b=>setBills(prev=>[...prev,b])}
         onDelete={id=>setBills(prev=>prev.filter(b=>b.id!==id))}
 
       />
-      <AccountsSheet open={showAccounts} onClose={()=>setShowAccounts(false)} accounts={accounts} sym={sym} activeAccount={activeAccount}
-        onAdd={a=>setAccounts(prev=>[...prev,a])}
-        onDelete={id=>{ setAccounts(prev=>prev.filter(a=>a.id!==id)); if(activeAccount===id)setActiveAccount(null); }}
-        onUpdate={(id,bal)=>setAccounts(prev=>prev.map(a=>a.id===id?{...a,balance:bal}:a))}
-        onSetActive={id=>setActiveAccount(id)}
-      />
-      <TrophiesSheet open={showTrophies} onClose={()=>setShowTrophies(false)} unlocked={unlocked} allTimeTrophies={allTimeTrophies} customTrophies={customTrophies} onCreateTrophy={()=>setShowCreateTrophy(true)} onDeleteCustom={id=>setCustomTrophies(prev=>prev.filter(t=>t.id!==id))}/>
+
+
 
       {/* ── TOP BAR ── */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"16px"}}>
@@ -1717,31 +1335,19 @@ export default function DayPay() {
           </div>
         </div>
 
-        {/* Always show credit card balances + active account */}
-        {accounts.filter(a=>a.type==="credit"||(activeAccount&&a.id===activeAccount&&a.type!=="credit")).length>0&&(
+        {/* Credit card balances */}
+        {creditCards.length>0&&(
           <div style={{marginBottom:"8px",paddingBottom:"8px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-            {accounts.filter(a=>a.type==="credit").map(a=>(
-              <div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+            {creditCards.map(card=>(
+              <div key={card.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
                 <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:"5px"}}>
-                  <span>💳</span><span>{a.name}</span>
+                  <span>💳</span><span>{card.name}</span>
                 </div>
                 <div style={{fontSize:"13px",fontWeight:"700",color:"#F87171"}}>
-                  Owed {sym}{a.balance.toFixed(2)}
+                  Owed {sym}{card.balance.toFixed(2)}
                 </div>
               </div>
             ))}
-            {activeAccount&&accounts.find(a=>a.id===activeAccount&&a.type!=="credit")&&(()=>{
-              const acc=accounts.find(a=>a.id===activeAccount);
-              const icon={savings:"🏦",cash:"💵"}[acc.type]||"🏦";
-              return (
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",display:"flex",alignItems:"center",gap:"5px"}}>
-                    <span>{icon}</span><span>{acc.name}</span>
-                  </div>
-                  <div style={{fontSize:"13px",fontWeight:"700",color:"#A78BFA"}}>{sym}{acc.balance.toFixed(2)}</div>
-                </div>
-              );
-            })()}
           </div>
         )}
 
@@ -1830,70 +1436,43 @@ export default function DayPay() {
         })()}
       </div>
 
-      {/* ── ADD EXPENSE BUTTON + TROPHY CABINET ── */}
+      {/* ── ADD EXPENSE BUTTON ── */}
       {!showCalc&&(
         <>
-          <button onClick={()=>setShowCalc(true)} style={{width:"100%",padding:"18px",marginBottom:"16px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"20px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+          <button onClick={()=>setShowCalc(true)} style={{width:"100%",padding:"18px",marginBottom:"10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"20px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
             <span style={{fontSize:"20px"}}>⊕</span> Add Expense or Income
           </button>
 
-          {/* Trophy Cabinet */}
-          <div style={{
-            background:"rgba(255,255,255,0.02)",
-            border:"1px solid rgba(255,255,255,0.06)",
-            borderRadius:"22px",padding:"18px 20px",flex:1
-          }}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
-              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2.5px",textTransform:"uppercase"}}>Trophy Cabinet</div>
-              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)"}}>{unlocked.length}/{TROPHIES.length} this period</div>
+          {/* Streak + Savings Pot */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"10px"}}>
+            <div style={{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.15)",borderRadius:"20px",padding:"16px"}}>
+              <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Streak</div>
+              <div style={{fontSize:"38px",fontWeight:"700",color:streak>0?"#FBBF24":"rgba(255,255,255,0.2)",fontFamily:"'Cormorant Garamond',serif",lineHeight:1,marginBottom:"4px"}}>{streak}</div>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)"}}>{streak===1?"day":"days"} under budget</div>
+              {balanceAdjustedToday&&<div style={{fontSize:"10px",color:"rgba(251,191,36,0.4)",marginTop:"4px"}}>adjusted today</div>}
             </div>
-
-            {unlocked.length === 0 ? (
-              <div style={{textAlign:"center",padding:"24px 0"}}>
-                <div style={{fontSize:"36px",marginBottom:"10px",opacity:0.3}}>🏆</div>
-                <div style={{fontSize:"13px",color:"rgba(255,255,255,0.25)",lineHeight:1.6}}>
-                  Stay under budget to<br/>start earning trophies
-                </div>
+            <div style={{background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:"20px",padding:"16px"}}>
+              <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Savings Pot</div>
+              <div style={{fontSize:"26px",fontWeight:"700",color:"#34D399",fontFamily:"'Cormorant Garamond',serif",lineHeight:1,marginBottom:"6px"}}>{sym}{savingsPot.toFixed(2)}</div>
+              <div style={{background:"rgba(255,255,255,0.08)",borderRadius:"4px",height:"4px",overflow:"hidden",marginBottom:"4px"}}>
+                <div style={{height:"100%",width:`${Math.min(potGoal>0?(savingsPot/potGoal)*100:0,100)}%`,background:"#34D399",borderRadius:"4px"}}/>
               </div>
-            ) : (
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px"}}>
-                {[...TROPHIES,...customTrophies].map(t=>{
-                  const earned = unlocked.includes(t.id);
-                  return (
-                    <div key={t.id} style={{
-                      background: earned ? "rgba(255,215,0,0.07)" : "rgba(255,255,255,0.025)",
-                      border: `1px solid ${earned ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.05)"}`,
-                      borderRadius:"16px",padding:"14px 8px",
-                      textAlign:"center",
-                      filter: earned ? "none" : "grayscale(1) opacity(0.2)",
-                      transition:"all 0.3s"
-                    }}>
-                      <div style={{fontSize:"28px",marginBottom:"6px",filter:earned?"drop-shadow(0 0 6px rgba(255,215,0,0.4))":"none"}}>{t.icon}</div>
-                      <div style={{fontSize:"10px",color:earned?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.25)",fontWeight:"600",lineHeight:1.3}}>{t.name}</div>
-                      {earned&&<div style={{fontSize:"9px",color:"#FFD700",marginTop:"4px",letterSpacing:"1px"}}>✓</div>}
-                    </div>
-                  );
-                })}
-                {/* Create custom trophy button */}
-                <button onClick={()=>setShowCreateTrophy(true)} style={{
-                  padding:"14px 8px",borderRadius:"16px",
-                  background:"rgba(167,139,250,0.07)",
-                  border:"1px dashed rgba(167,139,250,0.3)",
-                  cursor:"pointer",textAlign:"center",
-                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"4px"
-                }}>
-                  <div style={{fontSize:"22px",color:"#A78BFA"}}>+</div>
-                  <div style={{fontSize:"10px",color:"#A78BFA",fontWeight:"600",lineHeight:1.3}}>Create</div>
-                </button>
-              </div>
-            )}
-
-            {allTimeTrophies > 0 && (
-              <div style={{marginTop:"14px",paddingTop:"12px",borderTop:"1px solid rgba(255,255,255,0.05)",textAlign:"center",fontSize:"12px",color:"rgba(255,215,0,0.5)"}}>
-                🏅 {allTimeTrophies} earned all time
-              </div>
-            )}
+              <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)"}}>{sym}{potGoal} goal</div>
+            </div>
           </div>
+
+          {/* Pot history */}
+          {potHistory.length>0&&(
+            <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"20px",padding:"16px",marginBottom:"10px"}}>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Savings History</div>
+              {potHistory.slice(0,5).map((h,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<Math.min(potHistory.length,5)-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                  <div style={{fontSize:"12px",color:"rgba(255,255,255,0.5)"}}>{longDate(h.date)}</div>
+                  <div style={{fontSize:"12px",color:"#34D399",fontWeight:"600"}}>+{sym}{h.amount.toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -1922,26 +1501,23 @@ export default function DayPay() {
           <div style={{display:"flex",gap:"6px",marginBottom:"8px"}}>
             <input ref={labelRef} placeholder="Label (optional)" value={label} onChange={e=>setLabel(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAddExpense()}
               style={{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"9px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"13px",outline:"none"}}/>
-            {!isIncome&&accounts.length>0&&(
-              <select value={activeAccount||""} onChange={e=>setActiveAccount(e.target.value||null)}
-                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"10px",padding:"9px 10px",color:"rgba(255,255,255,0.7)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",outline:"none",colorScheme:"dark",maxWidth:"110px"}}>
+            {!isIncome&&creditCards.length>0&&(
+              <select value={incomeDestination==="main"?"":incomeDestination} onChange={e=>setIncomeDestination(e.target.value||"main")}
+                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"10px",padding:"9px 10px",color:"rgba(255,255,255,0.7)",fontFamily:"'DM Sans',sans-serif",fontSize:"12px",outline:"none",colorScheme:"dark",maxWidth:"120px"}}>
                 <option value="">Main</option>
-                {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                {creditCards.map(c=><option key={c.id} value={c.id}>💳 {c.name}</option>)}
               </select>
             )}
           </div>
           {/* Income destination — only shown when in income mode */}
           {isIncome&&(()=>{
             // Non-credit accounts only (can't "receive" money into a credit card, that's a payment)
-            const nonCreditAccounts = accounts.filter(a=>a.type!=="credit");
-            const creditAccounts = accounts.filter(a=>a.type==="credit");
-            // All destinations: main budget + non-credit accounts + credit cards (as "pay off")
+            // Destinations: main budget + credit card payoffs
             const destinations = [
               {id:"main", label:"Main Budget", icon:"💰"},
-              ...nonCreditAccounts.map(a=>({id:a.id, label:a.name, icon:a.type==="cash"?"💵":"🏦"})),
-              ...creditAccounts.flatMap(a=>[
-                {id:a.id, label:`Pay ${a.name}`, icon:"💳", creditPayoff:true, deductBalance:true},
-                {id:`${a.id}_noDeduct`, label:`Pay ${a.name} (no deduct)`, icon:"💳", creditPayoff:true, deductBalance:false, realAccId:a.id},
+              ...creditCards.flatMap(c=>[
+                {id:c.id, label:`Pay ${c.name}`, icon:"💳", creditPayoff:true, deductBalance:true},
+                {id:`${c.id}_noDeduct`, label:`Pay ${c.name} (no deduct)`, icon:"💳", creditPayoff:true, deductBalance:false, realAccId:c.id},
               ]),
             ];
             if(destinations.length<=1) return null;
@@ -2003,9 +1579,8 @@ export default function DayPay() {
       }}>
         {[
           {icon:"📊", label:"History",  action:()=>setShowHistory(true)},
-          {icon:"🏦", label:"Accounts", action:()=>setShowAccounts(true)},
+          {icon:"💳", label:"Cards",    action:()=>setShowCreditCards(true)},
           {icon:"🔄", label:"Bills",    action:()=>setShowBills(true), badge:upcomingBillsCount},
-          {icon:"🏆", label:"Trophies", action:()=>setShowTrophies(true)},
           {icon:"⚙️", label:"Settings", action:()=>setShowSettings(true)},
         ].map(item=>(
           <button key={item.label} onClick={item.action} style={{
