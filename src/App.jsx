@@ -1152,7 +1152,7 @@ export default function DayPay() {
     }
     return false;
   }).length;
-  const totalWins= history.filter(h=>h.under).length;
+
 
   const handleNumKey = (key) => {
     if(key==="⌫"){setDisplay(d=>d.length>1?d.slice(0,-1):"0");return;}
