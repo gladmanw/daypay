@@ -152,7 +152,9 @@ function getUpcomingBills(bills, paydayISO, fromISO) {
 }
 
 function reservedForBills(bills, paydayISO, fromISO) {
-  return getUpcomingBills(bills ?? [], paydayISO, fromISO).reduce((t,x)=>t+x.bill.amount, 0);
+  return getUpcomingBills(bills ?? [], paydayISO, fromISO)
+    .filter(x => (x.bill.deductMode ?? "reserve") === "reserve")
+    .reduce((t,x)=>t+x.bill.amount, 0);
 }
 
 // Daily budget = (balance − money committed to bills before payday) ÷ spending days
@@ -545,12 +547,13 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
   const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if(dy>0) setTranslateY(dy); };
   const handleTouchEnd   = () => { if(translateY>80){setTranslateY(0);onClose();}else setTranslateY(0); };
 
-  const [name,     setName]     = useState("");
-  const [amount,   setAmount]   = useState("");
-  const [freq,     setFreq]     = useState("monthly");
-  const [day,      setDay]      = useState("1");
-  const [billAccId,setBillAccId]= useState("main");
-  const [weekDay,  setWeekDay]  = useState("4"); // 0=Mon..6=Sun, default Friday
+  const [name,       setName]       = useState("");
+  const [amount,     setAmount]     = useState("");
+  const [freq,       setFreq]       = useState("monthly");
+  const [day,        setDay]        = useState("1");
+  const [billAccId,  setBillAccId]  = useState("main");
+  const [weekDay,    setWeekDay]    = useState("4"); // 0=Mon..6=Sun, default Friday
+  const [deductMode, setDeductMode] = useState("reserve"); // "reserve" or "day-of
 
   const [tab, setTab] = React.useState("spending");
   if (!open) return null;
@@ -558,8 +561,8 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
   const handleAdd = () => {
     const amt = parseFloat(amount);
     if (!name.trim() || !amt || amt <= 0) return;
-    onAdd({ id: `bill_${Date.now()}`, name: name.trim(), amount: amt, frequency: freq, dayOfMonth: parseInt(day)||1, dayOfWeek: parseInt(weekDay), accountId: billAccId });
-    setName(""); setAmount(""); setFreq("monthly"); setDay("1"); setWeekDay("4"); setBillAccId("main");
+    onAdd({ id: `bill_${Date.now()}`, name: name.trim(), amount: amt, frequency: freq, dayOfMonth: parseInt(day)||1, dayOfWeek: parseInt(weekDay), accountId: billAccId, deductMode });
+    setName(""); setAmount(""); setFreq("monthly"); setDay("1"); setWeekDay("4"); setBillAccId("main"); setDeductMode("reserve");
   };
 
   const monthlyTotal = bills.reduce((s,b) => {
@@ -586,7 +589,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
           <div style={{background:"rgba(251,191,36,0.07)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"14px",padding:"12px 14px",marginBottom:"20px",display:"flex",gap:"10px",alignItems:"flex-start"}}>
             <span style={{fontSize:"16px",flexShrink:0}}>💡</span>
             <div style={{fontSize:"12px",color:"rgba(255,255,255,0.55)",lineHeight:1.65}}>
-              Bills due before payday are <span style={{color:"#FBBF24",fontWeight:"600"}}>reserved straight away</span> — your daily budget drops as soon as you add one, and paying it on the due date won't count against that day's spending.
+              Bills can be set to <span style={{color:"#FBBF24",fontWeight:"600"}}>Reserve daily</span> (budget drops now, due date free) or <span style={{color:"#F87171",fontWeight:"600"}}>Deduct on the day</span> (budget unchanged, full amount hits on due date). You choose when adding each bill.
             </div>
           </div>
 
@@ -631,6 +634,30 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
             )}
             {/* Account selector */}
 
+            {/* Deduction mode toggle */}
+            <div style={{marginBottom:"10px"}}>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"8px"}}>How should this bill affect your budget?</div>
+              <div style={{display:"flex",gap:"6px",background:"rgba(0,0,0,0.2)",borderRadius:"12px",padding:"4px"}}>
+                <button onClick={()=>setDeductMode("reserve")} style={{
+                  flex:1,padding:"9px",borderRadius:"8px",border:"none",cursor:"pointer",
+                  background:deductMode==="reserve"?"rgba(251,191,36,0.15)":"transparent",
+                  color:deductMode==="reserve"?"#FBBF24":"rgba(255,255,255,0.35)",
+                  fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"12px"
+                }}>🔒 Reserve daily</button>
+                <button onClick={()=>setDeductMode("day-of")} style={{
+                  flex:1,padding:"9px",borderRadius:"8px",border:"none",cursor:"pointer",
+                  background:deductMode==="day-of"?"rgba(248,113,113,0.15)":"transparent",
+                  color:deductMode==="day-of"?"#F87171":"rgba(255,255,255,0.35)",
+                  fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"12px"
+                }}>📅 Deduct on the day</button>
+              </div>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginTop:"6px",lineHeight:1.6}}>
+                {deductMode==="reserve"
+                  ? "Your daily budget drops now and the bill won't count against spending on its due date."
+                  : "Your daily budget stays the same. The full amount deducts on the due date."}
+              </div>
+            </div>
+
             <button onClick={handleAdd} disabled={!name.trim()||!parseFloat(amount)} style={{
               width:"100%",padding:"13px",
               background:name.trim()&&parseFloat(amount)?"rgba(248,113,113,0.15)":"rgba(255,255,255,0.04)",
@@ -648,7 +675,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
               <div>
                 <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{b.name}</div>
                 <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>
-                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:b.frequency==="weekly"?` (${WEEK_DAYS[b.dayOfWeek ?? 4]}s)`:""}
+                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:b.frequency==="weekly"?` (${WEEK_DAYS[b.dayOfWeek ?? 4]}s)`:""} · {(b.deductMode??"reserve")==="reserve"?"🔒 Reserved":"📅 Day of"}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
