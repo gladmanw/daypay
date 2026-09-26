@@ -32,6 +32,8 @@ function toISO(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 }
 function todayISO() { return toISO(new Date()); }
+function parseISO(iso) { return new Date(iso+"T00:00:00"); }
+function addDaysISO(iso, n) { const d = parseISO(iso); d.setDate(d.getDate()+n); return toISO(d); }
 
 function getLastWorkingDay(year, month) {
   let d = new Date(year, month + 1, 0);
@@ -40,8 +42,9 @@ function getLastWorkingDay(year, month) {
 }
 
 // payConfig = { frequency, weekDay (0=Mon..6=Sun), monthDay (1-31 or "last_working"), customDate, anchorDate }
-function getNextPayday(schedule, customDate, payConfig) {
-  const today = new Date(); today.setHours(0,0,0,0);
+// refDate (optional): calculate "next payday" as if today were refDate — used when catching up missed days
+function getNextPayday(schedule, customDate, payConfig, refDate) {
+  const today = refDate ? new Date(refDate) : new Date(); today.setHours(0,0,0,0);
 
   // Legacy support for old schedule strings
   if (!payConfig) {
@@ -109,11 +112,66 @@ function getNextPayday(schedule, customDate, payConfig) {
 
 // Days from today UNTIL payday, NOT including payday itself
 // e.g. if payday is in 5 days, we get 5 spending days (today + 4 more)
-function daysUntilPayday(paydayISO) {
-  const today = new Date(); today.setHours(0,0,0,0);
+function daysUntilPayday(paydayISO, fromISO) {
+  const today = fromISO ? parseISO(fromISO) : new Date(); today.setHours(0,0,0,0);
   const payday = new Date(paydayISO+"T00:00:00"); payday.setHours(0,0,0,0);
   const diff = Math.ceil((payday - today) / 86400000);
   return Math.max(diff, 1); // days of spending = days before payday
+}
+
+// ─── Bill reservation helpers ─────────────────────────────────────────────────
+// Single source of truth for "is this bill due on this date?"
+function billDueOn(bill, date) {
+  if(bill.frequency==="daily")  return true;
+  if(bill.frequency==="weekly"){
+    // dayOfWeek: 0=Mon..6=Sun (same as pay schedule). Older bills without one default to Friday.
+    const dow = bill.dayOfWeek ?? 4;
+    return date.getDay() === (dow + 1) % 7;
+  }
+  if(bill.frequency==="monthly"){
+    // Clamp e.g. the 31st to the last day of shorter months so it never gets skipped
+    const lastDay = new Date(date.getFullYear(), date.getMonth()+1, 0).getDate();
+    return date.getDate() === Math.min(parseInt(bill.dayOfMonth)||1, lastDay);
+  }
+  return false;
+}
+
+// Bills that will hit AFTER today and BEFORE payday.
+// Today's bills were already deducted at day close; bills due on payday come out of the new pay.
+function getUpcomingBills(bills, paydayISO, fromISO) {
+  const out = [];
+  const d = fromISO ? parseISO(fromISO) : new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+1);
+  const payday = new Date(paydayISO+"T00:00:00");
+  for(let guard=0; d<payday && guard<400; guard++){
+    for(const b of bills){
+      if((b.accountId||"main")==="main" && billDueOn(b,d)) out.push({ bill:b, date:toISO(d) });
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+
+function reservedForBills(bills, paydayISO, fromISO) {
+  return getUpcomingBills(bills ?? [], paydayISO, fromISO).reduce((t,x)=>t+x.bill.amount, 0);
+}
+
+// Daily budget = (balance − money committed to bills before payday) ÷ spending days
+function calcDailyBudget(balance, bills, paydayISO, fromISO) {
+  const days = daysUntilPayday(paydayISO, fromISO);
+  const available = Math.max(0, balance - reservedForBills(bills, paydayISO, fromISO));
+  return parseFloat((days>0 ? available/days : available).toFixed(2));
+}
+
+// How a day's entries affect budget and balance
+//  regular : normal spending — counts against the day AND leaves the balance at day close
+//  payoff  : card payments from main — counts against the day, balance already reduced when logged
+//  income  : income into main — balance already increased when logged
+function summariseEntries(entries) {
+  const sum = (f) => (entries ?? []).filter(f).reduce((t,e)=>t+e.amount, 0);
+  const regular = sum(e=>!e.isCreditCard&&!e.isIncome&&!e.isBillDeduction&&!e.isAutoBalancer);
+  const payoff  = sum(e=>e.isAutoBalancer);
+  const income  = sum(e=>e.isIncome&&(e.destination??"main")==="main");
+  return { regular, payoff, income, spent: regular + payoff };
 }
 
 function isToday(iso) {
@@ -194,6 +252,11 @@ function DaySummaryModal({ summary, sym, onClose }) {
             </div>
           ))}
         </div>
+        {summary.awayDays>0 && (
+          <div style={{background:"rgba(251,191,36,0.07)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"14px",padding:"12px",marginBottom:"16px",fontSize:"12px",color:"rgba(255,255,255,0.6)",lineHeight:1.6,textAlign:"left"}}>
+            👋 Welcome back! We caught up {summary.awayDays+1} days while you were away — bills and payday included. Forgot to log something? Tap any day in <strong style={{color:"#fff"}}>History</strong> to add it.
+          </div>
+        )}
         {summary.expenses?.length>0 && (
           <div style={{background:"rgba(255,255,255,0.03)",borderRadius:"14px",padding:"12px",marginBottom:"20px",textAlign:"left"}}>
             <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>What you spent on</div>
@@ -487,6 +550,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
   const [freq,     setFreq]     = useState("monthly");
   const [day,      setDay]      = useState("1");
   const [billAccId,setBillAccId]= useState("main");
+  const [weekDay,  setWeekDay]  = useState("4"); // 0=Mon..6=Sun, default Friday
 
   const [tab, setTab] = React.useState("spending");
   if (!open) return null;
@@ -494,8 +558,8 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
   const handleAdd = () => {
     const amt = parseFloat(amount);
     if (!name.trim() || !amt || amt <= 0) return;
-    onAdd({ id: `bill_${Date.now()}`, name: name.trim(), amount: amt, frequency: freq, dayOfMonth: parseInt(day)||1, accountId: billAccId });
-    setName(""); setAmount(""); setFreq("monthly"); setDay("1"); setBillAccId("main");
+    onAdd({ id: `bill_${Date.now()}`, name: name.trim(), amount: amt, frequency: freq, dayOfMonth: parseInt(day)||1, dayOfWeek: parseInt(weekDay), accountId: billAccId });
+    setName(""); setAmount(""); setFreq("monthly"); setDay("1"); setWeekDay("4"); setBillAccId("main");
   };
 
   const monthlyTotal = bills.reduce((s,b) => {
@@ -522,7 +586,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
           <div style={{background:"rgba(251,191,36,0.07)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"14px",padding:"12px 14px",marginBottom:"20px",display:"flex",gap:"10px",alignItems:"flex-start"}}>
             <span style={{fontSize:"16px",flexShrink:0}}>💡</span>
             <div style={{fontSize:"12px",color:"rgba(255,255,255,0.55)",lineHeight:1.65}}>
-              Bills are <span style={{color:"#FBBF24",fontWeight:"600"}}>deducted in full on their due date</span> — your balance, daily budget, and what's left will all update automatically on the day the bill hits.
+              Bills due before payday are <span style={{color:"#FBBF24",fontWeight:"600"}}>reserved straight away</span> — your daily budget drops as soon as you add one, and paying it on the due date won't count against that day's spending.
             </div>
           </div>
 
@@ -549,6 +613,22 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
                   style={{width:"80px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"10px",padding:"10px 12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none"}}/>
               </div>
             )}
+            {freq==="weekly"&&(
+              <div style={{marginBottom:"10px"}}>
+                <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"6px"}}>Day of week</div>
+                <div style={{display:"flex",gap:"4px"}}>
+                  {WEEK_DAY_SHORT.map((d,i)=>(
+                    <button key={d} onClick={()=>setWeekDay(String(i))} style={{
+                      flex:1,padding:"9px 0",borderRadius:"10px",cursor:"pointer",
+                      background:weekDay===String(i)?"rgba(248,113,113,0.15)":"rgba(255,255,255,0.04)",
+                      border:weekDay===String(i)?"1px solid rgba(248,113,113,0.35)":"1px solid rgba(255,255,255,0.07)",
+                      color:weekDay===String(i)?"#F87171":"rgba(255,255,255,0.45)",
+                      fontFamily:"'DM Sans',sans-serif",fontSize:"12px",fontWeight:"600"
+                    }}>{d}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Account selector */}
 
             <button onClick={handleAdd} disabled={!name.trim()||!parseFloat(amount)} style={{
@@ -568,7 +648,7 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
               <div>
                 <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{b.name}</div>
                 <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)",marginTop:"2px"}}>
-                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:""}
+                  {sym}{b.amount.toFixed(2)} · {b.frequency}{b.frequency==="monthly"?` (day ${b.dayOfMonth})`:b.frequency==="weekly"?` (${WEEK_DAYS[b.dayOfWeek ?? 4]}s)`:""}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
@@ -584,7 +664,75 @@ function RecurringSheet({ open, onClose, bills, onAdd, onDelete, sym, accounts }
 }
 
 // ─── History Sheet ────────────────────────────────────────────────────────────
-function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHistory, potHistoryLog }) {
+// ─── Edit a past day ──────────────────────────────────────────────────────────
+function DayEditSheet({ day, sym, onClose, onSave }) {
+  const [entries, setEntries] = useState(day?.expenses ?? []);
+  const [amount,  setAmount]  = useState("");
+  const [label,   setLabel]   = useState("");
+  const [kind,    setKind]    = useState("expense");
+  if(!day) return null;
+
+  // Only plain expenses and income to main can be edited — bills and card payments are read-only
+  const editable = e => !e.isBillDeduction && !e.isAutoBalancer && !e.isCreditCard && !e.isCreditPayoff
+                        && (!e.isIncome || (e.destination??"main")==="main");
+  const add = () => {
+    const amt = parseFloat(amount);
+    if(!amt || amt<=0) return;
+    const base = { id:`edit_${Date.now()}`, amount:amt, label:label.trim() || (kind==="income"?"Income":"Expense"), addedLater:true };
+    setEntries(prev=>[...prev, kind==="income" ? {...base, isIncome:true, destination:"main"} : base]);
+    setAmount(""); setLabel("");
+  };
+  const { spent } = summariseEntries(entries);
+  const under = spent < day.budget;
+  const field = {background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"12px",padding:"12px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",boxSizing:"border-box"};
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
+      <div style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"20px 24px 48px",maxHeight:"88vh",overflowY:"auto",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"}}>
+        <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",color:"#fff"}}>{longDate(day.date)}</div>
+        <div style={{fontSize:"13px",color:under?"#34D399":"#F87171",margin:"4px 0 16px"}}>
+          {sym}{spent.toFixed(2)} of {sym}{day.budget.toFixed(2)} · {under?`under by ${sym}${(day.budget-spent).toFixed(2)}`:`over by ${sym}${(spent-day.budget).toFixed(2)}`}
+        </div>
+
+        {entries.length===0 && <div style={{textAlign:"center",padding:"16px 0",color:"rgba(255,255,255,0.25)",fontSize:"13px"}}>Nothing logged for this day</div>}
+        {entries.map(e=>(
+          <div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+            <div style={{fontSize:"14px",color:"rgba(255,255,255,0.75)"}}>
+              {e.label}{e.isBillDeduction&&<span style={{fontSize:"11px",color:"#FBBF24",marginLeft:"6px"}}>bill</span>}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+              <div style={{fontSize:"14px",fontWeight:"600",color:e.isIncome?"#34D399":"#fff"}}>{e.isIncome?"+":""}{sym}{e.amount.toFixed(2)}</div>
+              {editable(e) && (
+                <button onClick={()=>setEntries(prev=>prev.filter(x=>x.id!==e.id))} style={{background:"rgba(248,113,113,0.12)",border:"none",borderRadius:"8px",width:"28px",height:"28px",color:"#F87171",cursor:"pointer",fontSize:"15px"}}>×</button>
+              )}
+            </div>
+          </div>
+        ))}
+
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"18px",padding:"16px",margin:"20px 0"}}>
+          <div style={{display:"flex",gap:"6px",marginBottom:"10px",background:"rgba(0,0,0,0.2)",borderRadius:"12px",padding:"4px"}}>
+            {["expense","income"].map(k=>(
+              <button key={k} onClick={()=>setKind(k)} style={{flex:1,padding:"8px",borderRadius:"9px",border:"none",background:kind===k?"rgba(255,255,255,0.08)":"transparent",color:kind===k?"#fff":"rgba(255,255,255,0.35)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"13px",cursor:"pointer",textTransform:"capitalize"}}>{k}</button>
+            ))}
+          </div>
+          <input placeholder={kind==="income"?"What was it? (optional)":"What was it for? (optional)"} value={label} onChange={e=>setLabel(e.target.value)} style={{...field,width:"100%",marginBottom:"10px"}}/>
+          <div style={{display:"flex",gap:"8px"}}>
+            <input type="number" inputMode="decimal" placeholder={`${sym}0.00`} value={amount} onChange={e=>setAmount(e.target.value)} style={{...field,flex:1}}/>
+            <button onClick={add} style={{...field,background:"rgba(167,139,250,0.15)",border:"1px solid rgba(167,139,250,0.3)",color:"#A78BFA",fontWeight:"700",cursor:"pointer"}}>+ Add</button>
+          </div>
+        </div>
+
+        <button onClick={()=>onSave(entries)} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"15px",cursor:"pointer"}}>Save changes</button>
+        <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",textAlign:"center",marginTop:"10px",lineHeight:1.6}}>
+          Your balance and today's budget update to match. Savings for this day are recalculated if it's in the current pay period.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHistory, potHistoryLog, onEditDay }) {
   const [translateY, setTranslateY] = React.useState(0);
   const startY = React.useRef(null);
   const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; };
@@ -649,12 +797,16 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHi
                       <div style={{fontSize:"12px",color:"rgba(255,255,255,0.35)"}}>{monthWins}/{days.length} days · {sym}{monthSpent.toFixed(2)}</div>
                     </div>
                     {days.map((h,i)=>(
-                      <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                      <div key={i} onClick={()=>onEditDay?.(h.date)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer"}}>
                         <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
                           <span style={{fontSize:"16px"}}>{h.under?"✅":"❌"}</span>
                           <div>
                             <div style={{fontWeight:"600",fontSize:"14px",color:"#fff"}}>{shortDate(h.date)}</div>
-                            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>Budget {sym}{h.budget.toFixed(2)}</div>
+                            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>
+                              Budget {sym}{h.budget.toFixed(2)}
+                              {h.unlogged&&<span style={{color:"#FBBF24",marginLeft:"6px"}}>· not opened — tap to add</span>}
+                              {h.edited&&!h.unlogged&&<span style={{color:"#A78BFA",marginLeft:"6px"}}>· edited</span>}
+                            </div>
                           </div>
                         </div>
                         <div style={{textAlign:"right"}}>
@@ -733,14 +885,16 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHi
 
 // ─── FAQ Components ───────────────────────────────────────────────────────────
 const FAQ_ITEMS = [
-  {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day by dividing your current balance by the number of days until payday. It's locked for the entire day so you always have a consistent target to aim for."},
+  {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day. We take your current balance, set aside any bills due before payday, and divide what's left by the number of days until payday. It's locked for the day so you always have a consistent target — adding or removing a bill adjusts it straight away."},
   {q:"Does adding expenses change my daily budget?", a:"No — expenses only affect What's Left for today. Your daily budget number stays fixed all day so you can clearly see how much you're allowed to spend regardless of what you've already logged."},
   {q:"What happens when I add income to my main account?", a:"Income is added to your current balance immediately. It doesn't change today's daily budget — but tomorrow when the day resets, the new daily budget will be calculated from your updated balance including the income."},
   {q:"What is 'What's Left'?", a:"What's Left is your daily budget minus today's expenses. It shows how much of today's allowance you still have. It goes down as you spend and is separate from your current balance."},
   {q:"What's the difference between Current Balance and What's Left?", a:"Current Balance is the total money in your main account — it updates with income and is cleared of expenses at midnight. What's Left is just today's remaining daily allowance."},
   {q:"How do credit cards work?", a:"Add your credit cards in the Cards section. Credit card expenses are tracked separately and don't affect your daily budget or current balance — because the money hasn't actually left your account yet. Each card shows what you currently owe."},
   {q:"How do I pay off my credit card?", a:"Use Income mode and select Pay [card name]. This reduces what you owe on the card and deducts from your current balance. If the payment has already left your account automatically, use Pay [card name] (no deduct) to just update the balance owed without touching your current balance."},
-  {q:"What are recurring bills?", a:"Bills are regular payments like Netflix or rent. Add them in the Bills section with a name, amount, frequency and due date. On the due date the app automatically creates an expense and deducts from your balance. The red badge on the Bills icon shows how many bills are coming up this month."},
+  {q:"What are recurring bills?", a:"Bills are regular payments like Netflix or rent. Add them in the Bills section with a name, amount, frequency and due date. Bills due before your next payday are reserved from your daily budget as soon as you add them. On the due date the money leaves your balance, but it doesn't count against that day's spending since it was already set aside. The red badge on the Bills icon shows how many bills are coming up this month."},
+  {q:"What if I don't open the app for a few days?", a:"Nothing is lost. Next time you open it, Day Pay closes each missed day in order — bills are paid on their due dates, payday is added if it passed, and each day gets its own budget. Missed days show as 'not opened' in History."},
+  {q:"Can I add something I forgot to log?", a:"Yes — open History and tap any day to add or remove expenses and income. Your balance and today's budget update to match, and savings for that day are recalculated if it's in the current pay period."},
   {q:"When does my day reset?", a:"At midnight your day closes automatically. Your current balance is updated, a summary of the day appears when you next open the app, and a fresh daily budget is calculated for the new day."},
   {q:"How do I update my current balance?", a:"Go to Settings and update the Current Balance field. When you save, the app works backwards so the number you type is exactly what shows on the main screen — your existing transactions stay intact. Note: updating your balance on a given day will pause your streak and savings pot for that day."},
   {q:"How does the streak work?", a:"Your streak counts consecutive days you stayed under budget without manually adjusting your balance. If you update your balance in Settings on a given day, the streak is paused for that day — it won't extend, but it won't break either. Only a day over budget resets it to zero."},
@@ -1045,14 +1199,16 @@ export default function DayPay() {
   const [balanceAdjustedToday,setBalanceAdjustedToday]= useState(saved?.balanceAdjustedToday ?? false);
   const [streakHistory,      setStreakHistory]      = useState(saved?.streakHistory      ?? []);
   const [potHistoryLog,      setPotHistoryLog]      = useState(saved?.potHistoryLog      ?? []);
+  const [periodStart,        setPeriodStart]        = useState(saved?.periodStart        ?? null);
+  const [editingDay,         setEditingDay]         = useState(null);
   const [editingPotGoal,  setEditingPotGoal]  = useState(false);
   const [showFaqMain,     setShowFaqMain]     = useState(false);
   const labelRef = useRef(null);
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog});
-  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog]);
+    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog,periodStart});
+  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog,lockedDailyBudget,periodStart]);
 
   // On app open — check if day has changed
   useEffect(()=>{
@@ -1063,12 +1219,14 @@ export default function DayPay() {
     }
   },[]);
 
-  // Lock the daily budget at start of each day — simple, no reconstruction
+  // Lock the daily budget at start of each day.
+  // If a day close is pending, runDayClose sets the lock from the post-close balance instead.
   useEffect(()=>{
     if(!setup) return;
-    const d = daysUntilPayday(setup.nextPayday || getNextPayday(null, null, setup.payConfig));
-    const newLocked = d>0 ? parseFloat((setup.currentBalance/d).toFixed(2)) : parseFloat(setup.currentBalance.toFixed(2));
-    setLockedDailyBudget(newLocked);
+    if(lastClosedDate && lastClosedDate!==todayISO()) return;
+    if(lockedDailyBudget!=null) return;
+    const np = setup.nextPayday || getNextPayday(null, null, setup.payConfig);
+    setLockedDailyBudget(calcDailyBudget(setup.currentBalance, bills, np));
   },[]);
 
   // Check every minute for midnight rollover
@@ -1084,98 +1242,97 @@ export default function DayPay() {
     return ()=>clearInterval(iv);
   },[setup]);
 
-  const runDayClose = (dateStr) => {
+  // Closes every day from lastClosed up to yesterday, one day at a time, so days the
+  // app wasn't opened still get their bills, payday, budget and savings handled correctly.
+  const runDayClose = (lastClosed) => {
     const stored = loadAll();
     if(!stored?.setup) return;
-    const s = stored.setup;
-    const ex = stored.expenses ?? [];
+    const today = todayISO();
+    if(!lastClosed || lastClosed >= today) return;
+
+    const s0          = stored.setup;
     const storedBills = stored.bills ?? [];
-    const today2 = new Date(); today2.setHours(0,0,0,0);
-    // Bills due TODAY: deduct from balance (they actually hit the account)
-    // Daily/weekly bills always hit; monthly only on their due day
-    const dueBills = storedBills.filter(b => {
-      if(b.frequency==="daily") return true;
-      if(b.frequency==="weekly") return today2.getDay()===5; // every Friday
-      if(b.frequency==="monthly") return today2.getDate()===parseInt(b.dayOfMonth);
-      return false;
-    }).map(b => ({
-      id:`bill_auto_${b.id}_${Date.now()}`,
-      label:b.name,
-      amount:b.amount,
-      auto:true,
-      isBillDeduction:true,
-      accountId: b.accountId||"main"
-    }));
-    // Deduct due bills from the correct account balance
-    const storedAccounts = stored.accounts ?? [];
-    dueBills.forEach(b => {
-      if(b.accountId && b.accountId!=="main"){
-        // Deduct from secondary account — will be handled via setAccounts below
+    let balance   = s0.currentBalance;
+    let payday    = s0.nextPayday || getNextPayday(null, null, s0.payConfig, parseISO(lastClosed));
+    let locked    = stored.lockedDailyBudget ?? calcDailyBudget(balance, storedBills, payday, lastClosed);
+    let pot       = stored.savingsPot ?? 0;
+    let potHist   = [...(stored.potHistory ?? [])];
+    let potLog    = [...(stored.potHistoryLog ?? [])];
+    let streakLog = [...(stored.streakHistory ?? [])];
+    let hist      = [...(stored.history ?? [])];
+    let periodStart = stored.periodStart ?? null;
+    let adjusted  = stored.balanceAdjustedToday ?? false;
+    let entries   = stored.expenses ?? [];
+    let paydayHit = false;
+    let lastSummary = null;
+    let closedCount = 0;
+
+    let d = lastClosed;
+    for(let guard=0; d < today && guard < 400; guard++){
+      if(payday <= d) payday = getNextPayday(null, null, s0.payConfig, parseISO(d));
+      const next = addDaysISO(d, 1);
+
+      // Bills that hit at the start of the next day
+      const dueBills = storedBills.filter(b => billDueOn(b, parseISO(next))).map(b => ({
+        id:`bill_auto_${b.id}_${next}`, label:b.name, amount:b.amount,
+        auto:true, isBillDeduction:true, accountId:b.accountId||"main"
+      }));
+      const billsPaid = dueBills.filter(b=>b.accountId==="main").reduce((t,b)=>t+b.amount,0);
+
+      const { regular, spent } = summariseEntries(entries);
+      const isUnder = spent < locked;
+      const summary = {
+        date:d, spent, budget:locked, under:isUnder, expenses:[...entries, ...dueBills],
+        adjusted, unlogged: closedCount>0   // days the app was never opened
+      };
+      hist.push(summary);
+      lastSummary = summary;
+
+      // Only regular spending leaves the balance here — payoffs/income were applied when logged
+      balance = Math.max(0, balance - regular - billsPaid);
+
+      // Savings pot for the day just closed (added before any payday reset).
+      // Days the app wasn't opened don't earn savings until the user reviews them in History.
+      const saving = Math.max(0, locked - spent);
+      if(isUnder && !adjusted && saving > 0 && closedCount===0){
+        pot = parseFloat((pot + saving).toFixed(2));
+        potHist = [{date:d, amount:saving}, ...potHist].slice(0,30);
       }
-    });
-    const allEx = [...ex, ...dueBills];
-    const nextPayday = s.nextPayday || getNextPayday(null, null, s.payConfig);
-    const days  = daysUntilPayday(nextPayday);
-    const daily = days>0 ? s.currentBalance/days : s.currentBalance;
-    const spent = allEx.filter(e=>!e.isCreditCard&&!e.isIncome).reduce((t,e)=>t+e.amount,0);
-    const isUnder = spent < daily;
 
-    const summary = {date:dateStr, spent, budget:daily, under:isUnder, expenses:allEx, adjusted:stored.balanceAdjustedToday??false};
+      // Payday lands on the next day
+      if(next === payday){
+        let streakNow = 0;
+        for(let i=hist.length-1;i>=0;i--){ if(hist[i].under&&!hist[i].adjusted) streakNow++; else break; }
+        if(streakNow>0) streakLog = [{streak:streakNow, date:d, label:shortDate(payday)}, ...streakLog].slice(0,24);
+        if(pot>0)       potLog    = [{amount:pot, date:d, label:shortDate(payday)}, ...potLog].slice(0,24);
+        pot = 0; potHist = [];
+        balance = balance + s0.monthlySalary;
+        periodStart = next;
+        paydayHit = true;
+        payday = getNextPayday(null, null, s0.payConfig, parseISO(next));
+      }
 
-    // Update history
-    setHistory(prev=>[...prev,summary]);
-    // Deduct spending from balance
-    const newBalance = Math.max(0, s.currentBalance - spent);
+      locked   = calcDailyBudget(balance, storedBills, payday, next);
+      entries  = [];
+      adjusted = false;
+      closedCount++;
+      d = next;
+    }
+
+    setHistory(hist);
     setExpenses([]);
     setDisplay("0");
-    setLastClosedDate(todayISO());
-    setDaySummary(summary);
-    // Clear locked budget so it recalculates fresh tomorrow
-    setLockedDailyBudget(null);
-
-    // Check if today is payday
-    const todayStr = todayISO();
-    if(isTodayPayday(nextPayday)){
-      // Log current streak to history before resetting
-      const currentStreak = (()=>{ let s2=0; const h=[...(stored.history??[]),summary]; for(let i=h.length-1;i>=0;i--){if(h[i].under&&!h[i].adjusted)s2++;else break;} return s2; })();
-      if(currentStreak > 0){
-        setStreakHistory(prev=>[{streak:currentStreak, date:dateStr, label:shortDate(nextPayday)}, ...prev].slice(0,24));
-      }
-      // Add income and show payday modal
-      const suggested = newBalance + s.monthlySalary;
-      const newNextPayday = getNextPayday(null, null, s.payConfig);
-      setSetup(prev=>({...prev,currentBalance:suggested,nextPayday:newNextPayday}));
-      setPaydayModal({suggestedBalance:suggested});
-      // Log savings pot total before reset
-      const currentPot = stored.savingsPot ?? 0;
-      if(currentPot > 0){
-        setPotHistoryLog(prev=>[{amount:currentPot, date:dateStr, label:shortDate(nextPayday)}, ...prev].slice(0,24));
-      }
-      // Reset pot and streak each pay period
-      setSavingsPot(0);
-      setPotHistory([]);
-    } else {
-      setSetup(prev=>({...prev,currentBalance:newBalance}));
-      // Deduct any bills assigned to secondary accounts
-      const billsOnAccounts = dueBills.filter(b=>b.accountId&&b.accountId!=="main");
-      if(billsOnAccounts.length>0){
-        setAccounts(prev=>prev.map(acc=>{
-          const totalForAcc = billsOnAccounts.filter(b=>b.accountId===acc.id).reduce((s,b)=>s+b.amount,0);
-          return totalForAcc>0 ? {...acc, balance:Math.max(0,acc.balance-totalForAcc)} : acc;
-        }));
-      }
-    }
-
-    // Savings pot — add today's saving if under budget and no balance adjustment
-    const todaySaving = Math.max(0, daily - spent);
-    const wasAdjusted = stored.balanceAdjustedToday ?? false;
-    if(isUnder && !wasAdjusted && todaySaving > 0){
-      const newPot = parseFloat(((stored.savingsPot ?? 0) + todaySaving).toFixed(2));
-      setSavingsPot(newPot);
-      setPotHistory(prev=>[{date:dateStr, amount:todaySaving}, ...prev].slice(0,30));
-    }
-    // Reset balance adjusted flag for new day
+    setSetup(prev=>({...prev, currentBalance:balance, nextPayday:payday}));
+    setLockedDailyBudget(locked);
+    setSavingsPot(pot);
+    setPotHistory(potHist);
+    setPotHistoryLog(potLog);
+    setStreakHistory(streakLog);
+    setPeriodStart(periodStart);
     setBalanceAdjustedToday(false);
+    setLastClosedDate(today);
+    setDaySummary(lastSummary ? {...lastSummary, awayDays: closedCount>1 ? closedCount-1 : 0} : null);
+    if(paydayHit) setPaydayModal({suggestedBalance:balance});
   };
 
 
@@ -1204,9 +1361,58 @@ export default function DayPay() {
   const sym      = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
   const payday   = storedPayday || getNextPayday(null, null, setup.payConfig);
   const days     = daysUntilPayday(payday);
-  const billsReservedPerDay = 0; // bills now deduct on the day, not spread
-  // Use locked daily budget (set at start of day) — only changes with income or settings update
-  const daily           = lockedDailyBudget ?? (days>0 ? currentBalance/days : currentBalance);
+  // Money set aside for bills due between tomorrow and payday
+  const reservedBills   = reservedForBills(bills, payday);
+  // Use locked daily budget (set at start of day) — changes with settings updates or bill changes
+  const daily           = lockedDailyBudget ?? calcDailyBudget(currentBalance, bills, payday);
+
+  // When bills are added/removed mid-day, shift today's locked budget by the change in reserved money
+  // (keeps the "locked for the day" behaviour but reflects new commitments immediately)
+  const updateBills = (nextBills) => {
+    const delta = reservedForBills(nextBills, payday) - reservedBills;
+    if(delta!==0 && lockedDailyBudget!=null){
+      setLockedDailyBudget(parseFloat(Math.max(0, lockedDailyBudget - delta/Math.max(days,1)).toFixed(2)));
+    }
+    setBills(nextBills);
+  };
+
+  // Edit a day that's already closed: fix its record, then ripple the difference into
+  // the balance, today's budget and (if it's this pay period) the savings pot.
+  const editPastDay = (date, newEntries) => {
+    const idx = history.findIndex(h=>h.date===date);
+    if(idx<0) return;
+    const old = history[idx];
+    const before = summariseEntries(old.expenses);
+    const after  = summariseEntries(newEntries);
+    const isUnder = after.spent < old.budget;
+    const updated = {...old, expenses:newEntries, spent:after.spent, under:isUnder, unlogged:false, edited:true};
+    setHistory(prev=>prev.map((h,i)=>i===idx?updated:h));
+
+    // Balance: less spending → more money, more income → more money
+    const balanceDelta = parseFloat(((before.regular - after.regular) + (after.income - before.income)).toFixed(2));
+    if(balanceDelta!==0){
+      setSetup(prev=>({...prev, currentBalance:Math.max(0, prev.currentBalance + balanceDelta)}));
+      if(lockedDailyBudget!=null){
+        setLockedDailyBudget(parseFloat(Math.max(0, lockedDailyBudget + balanceDelta/Math.max(days,1)).toFixed(2)));
+      }
+    }
+
+    // Savings pot — only for days in the current pay period
+    const inPotHistory = potHistory.some(p=>p.date===date);
+    const oldestPot = potHistory.length ? potHistory[potHistory.length-1].date : null;
+    const inPeriod = periodStart ? date >= periodStart : (inPotHistory || (oldestPot && date >= oldestPot));
+    if(inPeriod){
+      const oldSaving = potHistory.find(p=>p.date===date)?.amount ?? 0;
+      const newSaving = (isUnder && !old.adjusted) ? Math.max(0, parseFloat((old.budget - after.spent).toFixed(2))) : 0;
+      if(oldSaving!==newSaving){
+        setSavingsPot(prev=>Math.max(0, parseFloat((prev - oldSaving + newSaving).toFixed(2))));
+        setPotHistory(prev=>{
+          const rest = prev.filter(p=>p.date!==date);
+          return newSaving>0 ? [...rest, {date, amount:newSaving}].sort((a,b)=>b.date.localeCompare(a.date)) : rest;
+        });
+      }
+    }
+  };
   // Regular expenses (not credit card charges, not income entries)
   const spent           = expenses.filter(e=>!e.isCreditCard&&!e.isIncome&&!e.isAutoBalancer).reduce((s,e)=>s+e.amount,0);
   // Credit payoffs that deduct from balance count against "remaining" too
@@ -1245,8 +1451,10 @@ export default function DayPay() {
   const handleAddExpense = () => {
     const amt=parseFloat(display);
     if(!amt||amt<=0) return;
-    const acc = null; // secondary accounts removed — credit cards handled separately
-    const isCredit = false;
+    // The card picker next to the label reuses incomeDestination: "main" or a card id
+    const card = !isIncome ? creditCards.find(c=>c.id===incomeDestination) : null;
+    const isCredit = !!card;
+    const pairId = `pay_${Date.now()}`; // links a card payment to its balance deduction
 
     if(isIncome){
       // Income: add to chosen destination
@@ -1259,27 +1467,22 @@ export default function DayPay() {
           // Pay card AND deduct from main balance
           setSetup(prev=>({...prev,currentBalance:prev.currentBalance-amt}));
           // Auto balancing expense so remain updates correctly
-          setExpenses(prev=>[...prev,{id:Date.now()+1,label:'Pay '+destAcc.name,amount:amt,account:null,isAutoBalancer:true,linkedCreditCard:destAcc.name}]);
+          setExpenses(prev=>[...prev,{id:Date.now()+1,label:'Pay '+destAcc.name,amount:amt,account:null,isAutoBalancer:true,linkedCreditCard:destAcc.name,cardId:destAcc.id,pairId}]);
         }
         // Always reduce card balance owed
         setCreditCards(prev=>prev.map(c=>c.id===incomeDestination?{...c,balance:Math.max(0,c.balance-amt)}:c));
-      } else {
-        // No secondary accounts — credit cards handled above
       }
       const destAccName = destAcc?.name||null;
       const isCreditPayoff = destAcc?.type==="credit";
-      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:destAccName,isIncome:true,destination:incomeDestination,isCreditPayoff,deductBalance:incomeDeductBalance}]);
+      setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Income",amount:amt,account:destAccName,isIncome:true,destination:incomeDestination,isCreditPayoff,deductBalance:incomeDeductBalance,...(isCreditPayoff?{pairId}:{})}]);
     } else {
       if(isCredit){
         // Credit card expense: ONLY increases balance owed on the card — does NOT affect daily budget
-        setAccounts(prev=>prev.map(a=>a.id===activeAccount?{...a,balance:a.balance+amt}:a));
-        setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null,isCreditCard:true}]);
+        setCreditCards(prev=>prev.map(c=>c.id===card.id?{...c,balance:c.balance+amt}:c));
+        setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:card.name,cardId:card.id,isCreditCard:true}]);
       } else {
-        // Regular expense: deducts from daily budget as normal
-        setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:acc?.name||null}]);
-        if(acc){
-          // secondary account deduction removed
-        }
+        // Regular expense: counts against today's budget, leaves the balance at day close
+        setExpenses(prev=>[...prev,{id:Date.now(),label:label||"Expense",amount:amt,account:null}]);
       }
     }
     setDisplay("0"); setLabel(""); setShowCalc(false); setIsIncome(false); setIncomeDestination("main"); setIncomeDeductBalance(true);
@@ -1313,6 +1516,7 @@ export default function DayPay() {
           suggestedBalance={paydayModal.suggestedBalance}
           onConfirm={bal=>{
             setSetup(prev=>({...prev,currentBalance:bal}));
+            setLockedDailyBudget(calcDailyBudget(bal, bills, payday));
             setPaydayModal(null);
           }}
         />
@@ -1339,12 +1543,17 @@ export default function DayPay() {
         // So to make front screen show newBalance: currentBalance = newBalance + spent
         const newDisplayBalance = s.currentBalance;
         const trueBase = parseFloat((newDisplayBalance + spent).toFixed(2));
-        const newLocked = parseFloat((newDisplayBalance / Math.max(days,1)).toFixed(2));
+        const newLocked = calcDailyBudget(newDisplayBalance, bills, np);
         setLockedDailyBudget(newLocked);
         setBalanceAdjustedToday(true); // flag so streak doesn't extend today
         setSetup(prev=>({...prev,...s,currentBalance:trueBase,nextPayday:np}));
       }}/>
-      <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins} streakHistory={streakHistory} potHistoryLog={potHistoryLog}/>
+      <HistorySheet open={showHistory} onClose={()=>setShowHistory(false)} history={history} sym={sym} streak={streak} totalWins={totalWins} streakHistory={streakHistory} potHistoryLog={potHistoryLog} onEditDay={setEditingDay}/>
+      {editingDay&&(
+        <DayEditSheet day={history.find(h=>h.date===editingDay)} sym={sym}
+          onClose={()=>setEditingDay(null)}
+          onSave={entries=>{ editPastDay(editingDay, entries); setEditingDay(null); }}/>
+      )}
       {showFaqMain&&(
         <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
           <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={()=>setShowFaqMain(false)}/>
@@ -1365,8 +1574,8 @@ export default function DayPay() {
         onUpdate={(id,bal)=>setCreditCards(prev=>prev.map(c=>c.id===id?{...c,balance:bal}:c))}
       />
       <RecurringSheet open={showBills} onClose={()=>setShowBills(false)} bills={bills} sym={sym} accounts={[]}
-        onAdd={b=>setBills(prev=>[...prev,b])}
-        onDelete={id=>setBills(prev=>prev.filter(b=>b.id!==id))}
+        onAdd={b=>updateBills([...bills,b])}
+        onDelete={id=>updateBills(bills.filter(b=>b.id!==id))}
 
       />
 
@@ -1411,6 +1620,11 @@ export default function DayPay() {
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",marginTop:"4px"}}>
               {sym}{Math.max(0,currentBalance-spent).toFixed(2)} left · payday {shortDate(payday)}{todayIncome>0&&<span style={{color:"#34D399",marginLeft:"6px"}}>+{sym}{todayIncome.toFixed(2)} in</span>}
             </div>
+            {reservedBills>0&&(
+              <div style={{fontSize:"11px",color:"#FBBF24",marginTop:"2px",opacity:0.8}}>
+                🔒 {sym}{reservedBills.toFixed(2)} reserved for bills before payday
+              </div>
+            )}
 
           </div>
           <div style={{textAlign:"right"}}>
@@ -1427,7 +1641,7 @@ export default function DayPay() {
           <div style={{background:"rgba(12,12,28,0.95)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"14px",padding:"14px",marginBottom:"8px",animation:"slideUp 0.2s ease"}} onClick={()=>setShowBudgetTip(false)}>
             <div style={{fontSize:"11px",color:"#A78BFA",fontWeight:"600",marginBottom:"5px"}}>💡 How is this calculated?</div>
             <div style={{fontSize:"12px",color:"rgba(255,255,255,0.65)",lineHeight:1.7}}>
-              Your daily budget is your <strong style={{color:"#fff"}}>current balance ÷ days until payday</strong> — not including payday itself. This keeps your budget based only on the money already in your account. Tap anywhere to close.
+              Your daily budget is your <strong style={{color:"#fff"}}>current balance, minus bills due before payday, ÷ days until payday</strong> — not including payday itself. Bills are set aside in advance so the number is only money you can actually spend. Tap anywhere to close.
             </div>
           </div>
         )}
@@ -1468,25 +1682,31 @@ export default function DayPay() {
           const creditCharges  = expenses.filter(e=>e.isCreditCard);
           const incomeItems    = expenses.filter(e=>e.isIncome);
 
+          // Undo exactly what logging the entry did
+          const findCard = (id, name) => creditCards.find(c=>c.id===id) ?? creditCards.find(c=>c.name===name);
           const deletePill = (e) => {
-            if(e.isAutoBalancer){
-              setSetup(prev=>({...prev,currentBalance:prev.currentBalance+e.amount}));
-            } else if(e.isIncome){
-              if(e.destination==="main"||!e.destination){
-                setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
-              } else if(e.isCreditPayoff){
-                if(e.deductBalance!==false) setSetup(prev=>({...prev,currentBalance:prev.currentBalance+e.amount}));
-                setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:a.balance+e.amount}:a));
-              } else {
-                setAccounts(prev=>prev.map(a=>a.id===e.destination?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
-              }
-            } else {
-              const acc=accounts.find(a=>a.name===e.account);
-              if(acc){
-                if(e.isCreditCard) setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:Math.max(0,a.balance-e.amount)}:a));
-                else setAccounts(prev=>prev.map(a=>a.id===acc.id?{...a,balance:a.balance+e.amount}:a));
-              }
+            if(e.isAutoBalancer || e.isCreditPayoff){
+              // A card payment is two linked entries (the payment + its balance deduction) — undo both
+              const isPair = (x) => e.pairId ? x.pairId===e.pairId
+                : (x.amount===e.amount && (x.account===e.linkedCreditCard || x.linkedCreditCard===e.account));
+              const payment  = e.isCreditPayoff ? e : expenses.find(x=>x.isCreditPayoff && isPair(x));
+              const balancer = e.isAutoBalancer ? e : expenses.find(x=>x.isAutoBalancer && isPair(x));
+              if(balancer) setSetup(prev=>({...prev,currentBalance:prev.currentBalance+balancer.amount}));
+              const c = findCard(payment?.destination ?? balancer?.cardId, payment?.account ?? balancer?.linkedCreditCard);
+              if(c) setCreditCards(prev=>prev.map(x=>x.id===c.id?{...x,balance:x.balance+e.amount}:x));
+              const ids = [payment?.id, balancer?.id].filter(v=>v!=null);
+              setExpenses(p=>p.filter(x=>!ids.includes(x.id)));
+              return;
             }
+            if(e.isIncome){
+              // Income to main was added to the balance when logged
+              setSetup(prev=>({...prev,currentBalance:prev.currentBalance-e.amount}));
+            } else if(e.isCreditCard){
+              // Card purchase increased what's owed on the card
+              const c = findCard(e.cardId, e.account);
+              if(c) setCreditCards(prev=>prev.map(x=>x.id===c.id?{...x,balance:Math.max(0,x.balance-e.amount)}:x));
+            }
+            // Regular expenses: nothing to undo — balance is only deducted at day close
             setExpenses(p=>p.filter(x=>x.id!==e.id));
           };
 
