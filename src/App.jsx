@@ -956,23 +956,44 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHi
 }
 
 // ─── FAQ Components ───────────────────────────────────────────────────────────
-const FAQ_ITEMS = [
-  {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day. We take your current balance, set aside any bills due before payday, and divide what's left by the number of days until payday. It's locked for the day so you always have a consistent target — adding or removing a bill adjusts it straight away."},
-  {q:"Does adding expenses change my daily budget?", a:"No — expenses only affect What's Left for today. Your daily budget number stays fixed all day so you can clearly see how much you're allowed to spend regardless of what you've already logged."},
-  {q:"What happens when I add income to my main account?", a:"Income is added to your current balance immediately. It doesn't change today's daily budget — but tomorrow when the day resets, the new daily budget will be calculated from your updated balance including the income."},
-  {q:"What is 'What's Left'?", a:"What's Left is your daily budget minus today's expenses. It shows how much of today's allowance you still have. It goes down as you spend and is separate from your current balance."},
-  {q:"What's the difference between Current Balance and What's Left?", a:"Current Balance is the total money in your main account — it updates with income and is cleared of expenses at midnight. What's Left is just today's remaining daily allowance."},
-  {q:"How do credit cards work?", a:"Add your credit cards in the Cards section. Credit card expenses are tracked separately and don't affect your daily budget or current balance — because the money hasn't actually left your account yet. Each card shows what you currently owe."},
-  {q:"How do I pay off my credit card?", a:"Use Income mode and select Pay [card name]. This reduces what you owe on the card and deducts from your current balance. If the payment has already left your account automatically, use Pay [card name] (no deduct) to just update the balance owed without touching your current balance."},
-  {q:"What are recurring bills?", a:"Bills are regular payments like Netflix or rent. Add them in the Bills section with a name, amount, frequency and due date. When adding a bill you choose how it affects your budget. Reserve daily spreads the cost across your daily budget from today until the bill is due, so your spending money drops a little each day rather than all at once — and on the due date the money leaves your balance without counting as a day's expense since it was already set aside. Deduct on the day keeps your daily budget unchanged and deducts the full amount on the due date, appearing as a regular expense. The red badge on the Bills icon shows how many bills are due this month."},
-  {q:"What if I don't open the app for a few days?", a:"Nothing is lost. Next time you open it, Day Pay closes each missed day in order — bills are paid on their due dates, payday is added if it passed, and each day gets its own budget. Missed days show as 'not opened' in History."},
-  {q:"Can I add something I forgot to log?", a:"Yes — open History and tap any day to add or remove expenses and income. Your balance and today's budget update to match, and savings for that day are recalculated if it's in the current pay period."},
-  {q:"When does my day reset?", a:"At midnight your day closes automatically. Your current balance is updated, a summary of the day appears when you next open the app, and a fresh daily budget is calculated for the new day."},
-  {q:"How do I update my current balance?", a:"Go to Settings and update the Current Balance field. When you save, the app works backwards so the number you type is exactly what shows on the main screen — your existing transactions stay intact. Note: updating your balance on a given day will pause your streak and savings pot for that day."},
-  {q:"What's the difference between Reserve daily and Deduct on the day for bills?", a:"Reserve daily is best if you want to plan ahead — your daily budget drops as soon as you add the bill so you're never caught off guard. The cost is spread across the days until it's due, and on the actual due date the money leaves your balance without counting as spending for that day since it was already accounted for. Deduct on the day is simpler — your daily budget stays the same and the full amount hits on the due date just like a regular expense. Use Reserve daily for big bills like rent, and Deduct on the day for smaller predictable ones like subscriptions."},
-  {q:"How does the streak work?", a:"Your streak counts consecutive days you stayed under budget without manually adjusting your balance. If you update your balance in Settings on a given day, the streak is paused for that day — it won't extend, but it won't break either. Only a day over budget resets it to zero."},
-  {q:"How does the savings pot work?", a:"Every day you close under budget without adjusting your balance, the amount you saved (daily budget minus spending) is added to your pot. Tap the goal to set your own target. The pot resets each payday so every pay period is a fresh start. If you adjust your balance on a day, no savings are added for that day to keep things fair."},
-  {q:"Why does my streak say 'Balance updated today — Streak paused · No savings added'?", a:"This appears when you've updated your current balance in Settings on the same day. To keep things fair, the app doesn't count that day toward your streak or add to your savings pot, since the balance change could affect what counts as 'under budget'. Your existing streak and savings are safe — just that one day is skipped."},
+const FAQ_SECTIONS = [
+  {
+    title:"🧮 Calculator",
+    items:[
+      {q:"What is Calculator mode?", a:"Calculator mode is the simplest way to use Day Pay. Enter your balance and payday, and the app tells you exactly how much you can spend each day. Tap Update balance whenever your balance changes and your daily budget recalculates instantly. No expense tracking, no logging — just the number."},
+      {q:"How do I update my balance?", a:"Tap the green Update balance button on the main screen. A numpad appears — type your current balance and tap Update. Your daily budget recalculates immediately."},
+      {q:"Does my balance reset when I close the app?", a:"No — your balance and daily budget are saved on your device and will be exactly as you left them when you reopen the app."},
+      {q:"What is the balance history chart?", a:"Every time you update your balance it gets logged and shown as a bar chart covering the last 7 days. Green bars mean your balance held steady or went up. Red bars mean it dropped. The brightest bar is today. It gives you a quick visual of how your balance has been moving over the week."},
+    ]
+  },
+  {
+    title:"⭐ Pro",
+    items:[
+      {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day by dividing your current balance by the number of days until payday. It's locked for the entire day so you always have a consistent target to aim for."},
+      {q:"Does adding expenses change my daily budget?", a:"No — expenses only affect What's Left for today. Your daily budget stays fixed all day regardless of what you've logged."},
+      {q:"What is 'What's Left'?", a:"What's Left is your daily budget minus today's expenses. It goes down as you spend and is separate from your current balance."},
+      {q:"What happens when I add income?", a:"Income added to your main account updates your current balance immediately. It doesn't change today's daily budget but feeds into tomorrow's calculation when the day resets."},
+      {q:"How do credit cards work?", a:"Add your credit cards in the Cards section. Credit card expenses are tracked separately and don't affect your daily budget — because the money hasn't actually left your account yet. Each card shows what you currently owe."},
+      {q:"How do I pay off my credit card?", a:"Use Income mode and select Pay [card name]. This reduces what you owe and deducts from your current balance. If the payment already left automatically, use Pay [card name] (no deduct) to just update the balance owed without touching your current balance."},
+      {q:"What are recurring bills?", a:"Bills are regular payments like Netflix or rent. Add them with a name, amount, frequency and due date. Choose Reserve daily to spread the cost across your daily budget until the bill is due, or Deduct on the day to leave your budget unchanged and take the full amount on the due date."},
+      {q:"What's the difference between Reserve daily and Deduct on the day?", a:"Reserve daily drops your daily budget a little each day until the bill is due — no surprise on the day. Deduct on the day keeps your budget the same and the full amount hits like a regular expense. Use Reserve daily for big bills like rent, and Deduct on the day for smaller ones like subscriptions."},
+      {q:"How does the streak work?", a:"Your streak counts consecutive days under budget without manually adjusting your balance. Updating your balance pauses the streak for that day but doesn't break it. Going over budget doesn't reset it either — the streak just won't extend. At the end of each pay period your streak is logged to History."},
+      {q:"How does the savings pot work?", a:"Every day you close under budget without adjusting your balance, the amount saved is added to your pot. Set your own goal by tapping it. The pot resets each payday and logs your total so you can see how much you saved each pay period in History."},
+      {q:"Why does it say 'Balance updated today — Streak paused · No savings added'?", a:"This appears when you've updated your balance in Settings that day. To keep things fair the app skips that day for your streak and savings pot, since the balance change could affect what counts as under budget. Your existing streak and savings are safe."},
+      {q:"Can I add something I forgot to log?", a:"Yes — open History and tap any day to add or remove expenses and income. Your balance and today's budget update to match."},
+    ]
+  },
+  {
+    title:"📱 General",
+    items:[
+      {q:"How do I switch between Calculator and Pro mode?", a:"Use the toggle at the top of the main screen. The app remembers which mode you were using when you come back."},
+      {q:"How do I update my pay schedule or currency?", a:"Tap Settings in the bottom bar. From there you can update your balance, pay schedule, currency and monthly income."},
+      {q:"When does my day reset?", a:"At midnight your day closes automatically. Your balance is updated, a summary appears when you next open the app, and a fresh daily budget is calculated for the new day."},
+      {q:"What if I don't open the app for a few days?", a:"No problem — the app automatically catches up on missed days when you next open it. Bills due on those days are deducted, payday is processed if it passed, and your history is updated."},
+      {q:"Does Day Pay connect to my bank?", a:"No. Day Pay does not connect to any bank. All data is entered manually and saved locally on your device. Nothing leaves your phone."},
+      {q:"Is my data safe?", a:"Yes. Everything is stored locally on your device. There are no accounts, no servers, and no data is ever sent anywhere."},
+    ]
+  },
 ];
 
 function FaqItem({ item }) {
@@ -991,7 +1012,16 @@ function FaqItem({ item }) {
 }
 
 function FaqList() {
-  return <>{FAQ_ITEMS.map((item,i)=><FaqItem key={i} item={item}/>)}</>;
+  return (
+    <>
+      {FAQ_SECTIONS.map((section,si)=>(
+        <div key={si} style={{marginBottom:"24px"}}>
+          <div style={{fontSize:"13px",color:"#fff",fontWeight:"700",marginBottom:"10px",paddingBottom:"8px",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>{section.title}</div>
+          {section.items.map((item,i)=><FaqItem key={i} item={item}/>)}
+        </div>
+      ))}
+    </>
+  );
 }
 
 function SettingsSheet({ open, onClose, setup, onSave }) {
@@ -1005,7 +1035,6 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
   const [salary,    setSalary]    = useState(String(setup.monthlySalary));
   const [currency,  setCurrency]  = useState(setup.currency);
   const [payConfig, setPayConfig] = useState(setup.payConfig||{frequency:"monthly",monthDay:"last_working"});
-  const [showFaq,   setShowFaq]   = useState(false);
   const sym = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
 
   useEffect(()=>{
@@ -1083,9 +1112,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
             Save Changes
           </button>
 
-          <button onClick={()=>setShowFaq(true)} style={{width:"100%",padding:"14px",marginTop:"10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"16px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
-            <span>❓</span> FAQ
-          </button>
+
 
           <div style={{textAlign:"center",marginTop:"24px",paddingTop:"20px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
             <div style={{fontSize:"12px",color:"rgba(255,255,255,0.2)",lineHeight:1.8}}>
@@ -2064,6 +2091,10 @@ export default function DayPay() {
           display:"flex",justifyContent:"space-around",alignItems:"center",
           padding:"10px 0 24px",zIndex:100
         }}>
+          <button onClick={()=>setShowFaqMain(true)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",padding:"6px 12px",borderRadius:"12px"}}>
+            <span style={{fontSize:"20px"}}>❓</span>
+            <span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontWeight:"500",letterSpacing:"0.3px"}}>FAQ</span>
+          </button>
           <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",padding:"6px 12px",borderRadius:"12px"}}>
             <span style={{fontSize:"20px"}}>⚙️</span>
             <span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontWeight:"500",letterSpacing:"0.3px"}}>Settings</span>
