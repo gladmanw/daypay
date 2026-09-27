@@ -1283,8 +1283,8 @@ export default function DayPay() {
 
   // Persist everything
   useEffect(()=>{
-    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog,periodStart});
-  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog,lockedDailyBudget,periodStart]);
+    saveAll({setup,expenses,history,pendingSummary:daySummary,pendingPayday:paydayModal,lastClosedDate,bills,creditCards,lockedDailyBudget,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog,periodStart,appMode,balanceLog});
+  },[setup,expenses,history,daySummary,paydayModal,lastClosedDate,bills,creditCards,savingsPot,potGoal,potHistory,balanceAdjustedToday,streakHistory,potHistoryLog,lockedDailyBudget,periodStart,appMode,balanceLog]);
 
   // On app open — check if day has changed
   useEffect(()=>{
