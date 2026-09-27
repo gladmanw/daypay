@@ -2032,8 +2032,8 @@ export default function DayPay() {
             <span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontWeight:"500",letterSpacing:"0.3px"}}>{item.label}</span>
           </button>
         ))}
-      </div>
-      <div style={{height:"80px"}}/>
+      </div>}
+      <div style={{height:appMode==="pro"?"80px":"20px"}}/>
     </div>
   );
 }
