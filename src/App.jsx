@@ -533,6 +533,51 @@ function CreditCardSheet({ open, onClose, creditCards, onAdd, onDelete, onUpdate
   );
 }
 
+
+// ─── Update Balance Sheet (Calculator Mode) ───────────────────────────────────
+function UpdateBalanceSheet({ open, onClose, sym, currentBalance, onUpdate }) {
+  const [display, setDisplay] = useState(currentBalance.toFixed(2));
+
+  React.useEffect(()=>{
+    if(open) setDisplay(currentBalance.toFixed(2));
+  },[open]);
+
+  if(!open) return null;
+
+  const handleKey = (k) => {
+    if(k==="⌫") setDisplay(p=>p.length>1?p.slice(0,-1):"0");
+    else if(k==="."&&display.includes(".")) return;
+    else if(display==="0"&&k!==".") setDisplay(k);
+    else if(display.length<10) setDisplay(p=>p+k);
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={onClose}/>
+      <div style={{position:"relative",background:"linear-gradient(180deg,#111827,#0d1117)",borderRadius:"28px 28px 0 0",padding:"0 0 48px",animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1)"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
+          <div style={{width:"40px",height:"4px",borderRadius:"2px",background:"rgba(255,255,255,0.3)"}}/>
+        </div>
+        <div style={{padding:"0 24px"}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"22px",fontWeight:"700",color:"#fff",marginBottom:"16px"}}>Update Balance</div>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:"14px",padding:"14px 18px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"38px",fontWeight:"700",color:"#fff",lineHeight:1}}>{sym}{display}</div>
+            <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"20px",cursor:"pointer"}}>×</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginBottom:"10px"}}>
+            {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(k=>(
+              <button key={k} onClick={()=>handleKey(k)} style={{padding:"16px 0",borderRadius:"12px",border:"none",background:k==="⌫"?"rgba(248,113,113,0.1)":"rgba(255,255,255,0.06)",color:k==="⌫"?"#F87171":"rgba(255,255,255,0.85)",fontSize:"20px",fontWeight:"600",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}>{k}</button>
+            ))}
+          </div>
+          <button onClick={()=>{const v=parseFloat(display);if(v>0){onUpdate(v);onClose();}}} style={{width:"100%",padding:"15px",background:"rgba(52,211,153,0.15)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:"14px",color:"#34D399",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"16px",cursor:"pointer"}}>
+            Update to {sym}{display}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Recurring Bills Sheet ────────────────────────────────────────────────────
 const BILL_FREQUENCIES = [
   { id:"daily",   label:"Daily" },
@@ -1216,6 +1261,8 @@ export default function DayPay() {
   const [paydayModal,        setPaydayModal]        = useState(saved?.pendingPayday   ?? null);
   const [lastClosedDate,     setLastClosedDate]     = useState(saved?.lastClosedDate  ?? todayISO());
   const [showBudgetTip,      setShowBudgetTip]      = useState(false);
+  const [appMode,            setAppMode]            = useState(saved?.appMode            ?? "pro"); // "calculator" or "pro"
+  const [showUpdateBalance,  setShowUpdateBalance]  = useState(false);
   const [lockedDailyBudget,  setLockedDailyBudget]  = useState(saved?.lockedDailyBudget ?? null);
   const [bills,              setBills]              = useState(saved?.bills              ?? []);
   const [creditCards,        setCreditCards]        = useState(saved?.creditCards        ?? []);
@@ -1582,6 +1629,18 @@ export default function DayPay() {
           onClose={()=>setEditingDay(null)}
           onSave={entries=>{ editPastDay(editingDay, entries); setEditingDay(null); }}/>
       )}
+      <UpdateBalanceSheet
+        open={showUpdateBalance}
+        onClose={()=>setShowUpdateBalance(false)}
+        sym={sym}
+        currentBalance={setup.currentBalance}
+        onUpdate={v=>{
+          const trueBase = parseFloat((v + (appMode==="pro"?spent:0)).toFixed(2));
+          setSetup(prev=>({...prev,currentBalance:trueBase}));
+          const newLocked = parseFloat((v/Math.max(days,1)).toFixed(2));
+          setLockedDailyBudget(newLocked);
+        }}
+      />
       {showFaqMain&&(
         <div style={{position:"fixed",inset:0,zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
           <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)"}} onClick={()=>setShowFaqMain(false)}/>
@@ -1610,17 +1669,27 @@ export default function DayPay() {
 
 
       {/* ── TOP BAR ── */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"16px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"10px"}}>
         <div>
           <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"26px",fontWeight:"700",letterSpacing:"-0.3px",lineHeight:1}}>Day Pay</div>
           <div style={{fontSize:"10px",color:"rgba(255,255,255,0.28)",marginTop:"4px",letterSpacing:"0.2px",lineHeight:1.4,maxWidth:"200px"}}>Budgeting that makes every day, Pay Day</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"2px"}}>
-          {streak>0&&<div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"50px",padding:"4px 10px",fontSize:"12px",color:"#FBBF24"}}>🔥 {streak}</div>}
+          {appMode==="pro"&&streak>0&&<div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:"50px",padding:"4px 10px",fontSize:"12px",color:"#FBBF24"}}>🔥 {streak}</div>}
           <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>
             {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
           </div>
         </div>
+      </div>
+
+      {/* Mode toggle */}
+      <div style={{display:"flex",gap:"6px",background:"rgba(0,0,0,0.2)",borderRadius:"12px",padding:"3px",marginBottom:"12px"}}>
+        <button onClick={()=>setAppMode("calculator")} style={{flex:1,padding:"7px",borderRadius:"9px",border:"none",background:appMode==="calculator"?"rgba(255,255,255,0.08)":"transparent",color:appMode==="calculator"?"#fff":"rgba(255,255,255,0.35)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"12px",cursor:"pointer"}}>
+          🧮 Calculator
+        </button>
+        <button onClick={()=>setAppMode("pro")} style={{flex:1,padding:"7px",borderRadius:"9px",border:"none",background:appMode==="pro"?"rgba(255,255,255,0.08)":"transparent",color:appMode==="pro"?"#fff":"rgba(255,255,255,0.35)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"12px",cursor:"pointer"}}>
+          ⭐ Pro
+        </button>
       </div>
 
       {/* ── BUDGET CARD ── */}
@@ -1690,7 +1759,7 @@ export default function DayPay() {
           </div>
         )}
 
-        {expenses.length>0&&(
+        {appMode==="pro"&&expenses.length>0&&(
           <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',marginTop:'4px',paddingTop:'8px'}}>
             <button onClick={()=>setShowTransactions(v=>!v)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',background:'none',border:'none',cursor:'pointer',paddingBottom:'4px'}}>
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
@@ -1781,15 +1850,22 @@ export default function DayPay() {
         })()}
       </div>
 
-      {/* ── ADD EXPENSE BUTTON ── */}
-      {!showCalc&&(
+      {/* ── CALCULATOR MODE UPDATE BALANCE BUTTON ── */}
+      {appMode==="calculator"&&(
+        <button onClick={()=>setShowUpdateBalance(true)} style={{width:"100%",padding:"18px",marginBottom:"10px",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:"20px",color:"#34D399",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+          <span style={{fontSize:"20px"}}>✎</span> Update balance
+        </button>
+      )}
+
+      {/* ── ADD EXPENSE BUTTON (full mode only) ── */}
+      {appMode==="pro"&&!showCalc&&(
         <>
           <button onClick={()=>setShowCalc(true)} style={{width:"100%",padding:"18px",marginBottom:"10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:"20px",color:"rgba(255,255,255,0.5)",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
             <span style={{fontSize:"20px"}}>⊕</span> Add Expense or Income
           </button>
 
-          {/* Streak + Savings Pot */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"10px"}}>
+          {/* Streak + Savings Pot — full mode only */}
+          {appMode==="pro"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"10px"}}>
             <div style={{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.15)",borderRadius:"20px",padding:"16px"}}>
               <div style={{fontSize:"10px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Streak</div>
               <div style={{fontSize:"38px",fontWeight:"700",color:streak>0?"#FBBF24":"rgba(255,255,255,0.2)",fontFamily:"'Cormorant Garamond',serif",lineHeight:1,marginBottom:"4px"}}>{streak}</div>
@@ -1822,9 +1898,10 @@ export default function DayPay() {
                 </div>
               )}
             </div>
-          </div>
+          </div>}
 
-          {/* Pot history */}
+          {/* Pot history — full mode only */}
+          {appMode==="pro"&&
 
         </>
       )}
@@ -1920,8 +1997,8 @@ export default function DayPay() {
         </div>
       )}
 
-      {/* ── BOTTOM NAV ── */}
-      <div style={{
+      {/* ── BOTTOM NAV (full mode only) ── */}
+      {appMode==="pro"&&<div style={{
         position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
         width:"100%",maxWidth:"420px",
         background:"rgba(8,15,18,0.95)",
