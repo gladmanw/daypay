@@ -1900,9 +1900,6 @@ export default function DayPay() {
             </div>
           </div>}
 
-          {/* Pot history — full mode only */}
-          {appMode==="pro"&&
-
         </>
       )}
 
