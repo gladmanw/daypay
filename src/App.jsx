@@ -1873,7 +1873,15 @@ export default function DayPay() {
             return (
               <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"20px",padding:"16px",marginBottom:"10px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
-                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase"}}>Balance history</div>
+                  <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                    <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase"}}>Balance history</div>
+                    <div style={{position:"relative",display:"inline-block"}} onClick={e=>{e.stopPropagation();const t=e.currentTarget.querySelector('.chart-tip');t.style.display=t.style.display==='block'?'none':'block';}}>
+                      <div style={{width:"14px",height:"14px",borderRadius:"50%",background:"rgba(167,139,250,0.2)",border:"1px solid rgba(167,139,250,0.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"9px",color:"#A78BFA",cursor:"pointer",fontWeight:"700"}}>?</div>
+                      <div className="chart-tip" style={{display:"none",position:"absolute",top:"20px",left:0,background:"rgba(12,12,28,0.98)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"12px",padding:"10px 12px",width:"220px",zIndex:50,fontSize:"11px",color:"rgba(255,255,255,0.6)",lineHeight:1.7}}>
+                        Each bar shows your balance on that day. <span style={{color:"#34D399"}}>Green</span> means your balance held steady or went up. <span style={{color:"#F87171"}}>Red</span> means it dropped. The brightest bar is today. Tap to close.
+                      </div>
+                    </div>
+                  </div>
                   <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>7 days</div>
                 </div>
                 <div style={{display:"flex",alignItems:"flex-end",gap:"6px",height:"80px",justifyContent:"space-around"}}>
