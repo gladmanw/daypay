@@ -1036,6 +1036,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
   const [salary,    setSalary]    = useState(String(setup.monthlySalary));
   const [currency,  setCurrency]  = useState(setup.currency);
   const [payConfig, setPayConfig] = useState(setup.payConfig||{frequency:"monthly",monthDay:"last_working"});
+  const [showFaq,   setShowFaq]   = useState(false);
   const sym = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
 
   useEffect(()=>{
