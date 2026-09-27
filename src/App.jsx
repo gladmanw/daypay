@@ -958,6 +958,17 @@ function HistorySheet({ open, onClose, history, sym, streak, totalWins, streakHi
 // ─── FAQ Components ───────────────────────────────────────────────────────────
 const FAQ_SECTIONS = [
   {
+    title:"📱 General",
+    items:[
+      {q:"How do I switch between Calculator and Pro mode?", a:"Use the toggle at the top of the main screen. The app remembers which mode you were using when you come back."},
+      {q:"How do I update my pay schedule or currency?", a:"Tap Settings in the bottom bar. From there you can update your balance, pay schedule, currency and monthly income."},
+      {q:"When does my day reset?", a:"At midnight your day closes automatically. Your balance is updated, a summary appears when you next open the app, and a fresh daily budget is calculated for the new day."},
+      {q:"What if I don't open the app for a few days?", a:"No problem — the app automatically catches up on missed days when you next open it. Bills due on those days are deducted, payday is processed if it passed, and your history is updated."},
+      {q:"Does Day Pay connect to my bank?", a:"No. Day Pay does not connect to any bank. All data is entered manually and saved locally on your device. Nothing leaves your phone."},
+      {q:"Is my data safe?", a:"Yes. Everything is stored locally on your device. There are no accounts, no servers, and no data is ever sent anywhere."},
+    ]
+  },
+  {
     title:"🧮 Calculator",
     items:[
       {q:"What is Calculator mode?", a:"Calculator mode is the simplest way to use Day Pay. Enter your balance and payday, and the app tells you exactly how much you can spend each day. Tap Update balance whenever your balance changes and your daily budget recalculates instantly. No expense tracking, no logging — just the number."},
@@ -981,17 +992,6 @@ const FAQ_SECTIONS = [
       {q:"How does the savings pot work?", a:"Every day you close under budget without adjusting your balance, the amount saved is added to your pot. Set your own goal by tapping it. The pot resets each payday and logs your total so you can see how much you saved each pay period in History."},
       {q:"Why does it say 'Balance updated today — Streak paused · No savings added'?", a:"This appears when you've updated your balance in Settings that day. To keep things fair the app skips that day for your streak and savings pot, since the balance change could affect what counts as under budget. Your existing streak and savings are safe."},
       {q:"Can I add something I forgot to log?", a:"Yes — open History and tap any day to add or remove expenses and income. Your balance and today's budget update to match."},
-    ]
-  },
-  {
-    title:"📱 General",
-    items:[
-      {q:"How do I switch between Calculator and Pro mode?", a:"Use the toggle at the top of the main screen. The app remembers which mode you were using when you come back."},
-      {q:"How do I update my pay schedule or currency?", a:"Tap Settings in the bottom bar. From there you can update your balance, pay schedule, currency and monthly income."},
-      {q:"When does my day reset?", a:"At midnight your day closes automatically. Your balance is updated, a summary appears when you next open the app, and a fresh daily budget is calculated for the new day."},
-      {q:"What if I don't open the app for a few days?", a:"No problem — the app automatically catches up on missed days when you next open it. Bills due on those days are deducted, payday is processed if it passed, and your history is updated."},
-      {q:"Does Day Pay connect to my bank?", a:"No. Day Pay does not connect to any bank. All data is entered manually and saved locally on your device. Nothing leaves your phone."},
-      {q:"Is my data safe?", a:"Yes. Everything is stored locally on your device. There are no accounts, no servers, and no data is ever sent anywhere."},
     ]
   },
 ];
