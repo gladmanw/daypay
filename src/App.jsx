@@ -1116,6 +1116,17 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
 
 
 
+          {/* Feedback */}
+          <div style={{marginTop:"24px",paddingTop:"20px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Share your thoughts</div>
+            <a href="mailto:daypayteam@gmail.com?subject=Day Pay Feedback&body=Hi, here's my feedback on Day Pay:%0A%0A" style={{display:"block",textDecoration:"none"}}>
+              <div style={{width:"100%",padding:"14px",background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:"14px",color:"#A78BFA",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"14px",textAlign:"center",cursor:"pointer"}}>
+                ✉️ Send Feedback
+              </div>
+            </a>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",textAlign:"center",marginTop:"6px"}}>Your feedback goes directly to the team</div>
+          </div>
+
           <div style={{textAlign:"center",marginTop:"24px",paddingTop:"20px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
             <div style={{fontSize:"12px",color:"rgba(255,255,255,0.2)",lineHeight:1.8}}>
               Created by
