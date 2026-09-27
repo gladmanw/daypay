@@ -1263,6 +1263,7 @@ export default function DayPay() {
   const [showBudgetTip,      setShowBudgetTip]      = useState(false);
   const [appMode,            setAppMode]            = useState(saved?.appMode            ?? "pro"); // "calculator" or "pro"
   const [showUpdateBalance,  setShowUpdateBalance]  = useState(false);
+  const [balanceLog,         setBalanceLog]         = useState(saved?.balanceLog ?? []);
   const [lockedDailyBudget,  setLockedDailyBudget]  = useState(saved?.lockedDailyBudget ?? null);
   const [bills,              setBills]              = useState(saved?.bills              ?? []);
   const [creditCards,        setCreditCards]        = useState(saved?.creditCards        ?? []);
@@ -1639,6 +1640,12 @@ export default function DayPay() {
           setSetup(prev=>({...prev,currentBalance:trueBase}));
           const newLocked = parseFloat((v/Math.max(days,1)).toFixed(2));
           setLockedDailyBudget(newLocked);
+          // Log balance update for chart
+          const today = todayISO();
+          setBalanceLog(prev=>{
+            const filtered = prev.filter(e=>e.date!==today);
+            return [...filtered,{date:today,balance:v}].slice(-7);
+          });
         }}
       />
       {showFaqMain&&(
@@ -1850,11 +1857,55 @@ export default function DayPay() {
         })()}
       </div>
 
-      {/* ── CALCULATOR MODE UPDATE BALANCE BUTTON ── */}
+      {/* ── CALCULATOR MODE ── */}
       {appMode==="calculator"&&(
-        <button onClick={()=>setShowUpdateBalance(true)} style={{width:"100%",padding:"18px",marginBottom:"10px",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:"20px",color:"#34D399",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
-          <span style={{fontSize:"20px"}}>✎</span> Update balance
-        </button>
+        <>
+          <button onClick={()=>setShowUpdateBalance(true)} style={{width:"100%",padding:"18px",marginBottom:"12px",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:"20px",color:"#34D399",fontFamily:"'DM Sans',sans-serif",fontWeight:"600",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+            <span style={{fontSize:"20px"}}>✎</span> Update balance
+          </button>
+
+          {/* 7-day balance chart */}
+          {balanceLog.length>0&&(()=>{
+            const logs = balanceLog.slice(-7);
+            const maxB = Math.max(...logs.map(l=>l.balance));
+            const minB = Math.min(...logs.map(l=>l.balance));
+            const range = maxB - minB || 1;
+            return (
+              <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"20px",padding:"16px",marginBottom:"10px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
+                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",letterSpacing:"2px",textTransform:"uppercase"}}>Balance history</div>
+                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>7 days</div>
+                </div>
+                <div style={{display:"flex",alignItems:"flex-end",gap:"6px",height:"80px",justifyContent:"space-around"}}>
+                  {logs.map((l,i)=>{
+                    const heightPct = range===0?60:20+((l.balance-minB)/range)*60;
+                    const isLatest = i===logs.length-1;
+                    const trend = i>0 ? l.balance >= logs[i-1].balance : true;
+                    return (
+                      <div key={l.date} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",flex:1}}>
+                        <div style={{fontSize:"9px",color:isLatest?"#34D399":"rgba(255,255,255,0.3)",fontWeight:isLatest?"700":"400"}}>{sym}{(l.balance/1000).toFixed(1)}k</div>
+                        <div style={{
+                          width:"100%",maxWidth:"36px",
+                          height:`${heightPct}px`,
+                          background:isLatest?"#34D399":trend?"rgba(52,211,153,0.4)":"rgba(248,113,113,0.4)",
+                          borderRadius:"6px 6px 3px 3px",
+                          transition:"height 0.5s ease"
+                        }}/>
+                        <div style={{fontSize:"9px",color:"rgba(255,255,255,0.3)"}}>{shortDate(l.date)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",marginTop:"10px",paddingTop:"10px",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>7 days ago: <span style={{color:"#fff"}}>{sym}{balanceLog[0]?.balance.toFixed(2)}</span></div>
+                  <div style={{fontSize:"11px",color:(balanceLog[balanceLog.length-1]?.balance||0)>=(balanceLog[0]?.balance||0)?"#34D399":"#F87171",fontWeight:"600"}}>
+                    {(balanceLog[balanceLog.length-1]?.balance||0)>=(balanceLog[0]?.balance||0)?"↑":"↓"} {sym}{Math.abs((balanceLog[balanceLog.length-1]?.balance||0)-(balanceLog[0]?.balance||0)).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </>
       )}
 
       {/* ── ADD EXPENSE BUTTON (full mode only) ── */}
@@ -1994,7 +2045,23 @@ export default function DayPay() {
         </div>
       )}
 
-      {/* ── BOTTOM NAV (full mode only) ── */}
+      {/* ── BOTTOM NAV ── */}
+      {appMode==="calculator"&&(
+        <div style={{
+          position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
+          width:"100%",maxWidth:"420px",
+          background:"rgba(8,15,18,0.95)",
+          backdropFilter:"blur(20px)",
+          borderTop:"1px solid rgba(255,255,255,0.07)",
+          display:"flex",justifyContent:"space-around",alignItems:"center",
+          padding:"10px 0 24px",zIndex:100
+        }}>
+          <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",padding:"6px 12px",borderRadius:"12px"}}>
+            <span style={{fontSize:"20px"}}>⚙️</span>
+            <span style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif",fontWeight:"500",letterSpacing:"0.3px"}}>Settings</span>
+          </button>
+        </div>
+      )}
       {appMode==="pro"&&<div style={{
         position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
         width:"100%",maxWidth:"420px",
