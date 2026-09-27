@@ -961,6 +961,7 @@ const FAQ_SECTIONS = [
     title:"📱 General",
     items:[
       {q:"How do I switch between Calculator and Pro mode?", a:"Use the toggle at the top of the main screen. The app remembers which mode you were using when you come back."},
+      {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day by dividing your current balance by the number of days until payday. It's locked for the entire day so you always have a consistent target to aim for. In Calculator mode you update your balance manually whenever you like and the budget recalculates instantly. In Pro mode it locks in at the start of the day and only changes if you update your balance in Settings."},
       {q:"How do I update my pay schedule or currency?", a:"Tap Settings in the bottom bar. From there you can update your balance, pay schedule, currency and monthly income."},
       {q:"When does my day reset?", a:"At midnight your day closes automatically. Your balance is updated, a summary appears when you next open the app, and a fresh daily budget is calculated for the new day."},
       {q:"What if I don't open the app for a few days?", a:"No problem — the app automatically catches up on missed days when you next open it. Bills due on those days are deducted, payday is processed if it passed, and your history is updated."},
@@ -980,7 +981,7 @@ const FAQ_SECTIONS = [
   {
     title:"⭐ Pro",
     items:[
-      {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day by dividing your current balance by the number of days until payday. It's locked for the entire day so you always have a consistent target to aim for."},
+
       {q:"Does adding expenses change my daily budget?", a:"No — expenses only affect What's Left for today. Your daily budget stays fixed all day regardless of what you've logged."},
       {q:"What is 'What's Left'?", a:"What's Left is your daily budget minus today's expenses. It goes down as you spend and is separate from your current balance."},
       {q:"What happens when I add income?", a:"Income added to your main account updates your current balance immediately. It doesn't change today's daily budget but feeds into tomorrow's calculation when the day resets."},
