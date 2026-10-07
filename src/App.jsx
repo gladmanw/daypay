@@ -2,6 +2,26 @@
 import React, { useState, useEffect, useRef } from "react";
 
 // ─── Currencies ───────────────────────────────────────────────────────────────
+const COUNTRIES = [
+  {code:"GB", flag:"🇬🇧", name:"United Kingdom"},
+  {code:"US", flag:"🇺🇸", name:"United States"},
+  {code:"AU", flag:"🇦🇺", name:"Australia"},
+  {code:"CA", flag:"🇨🇦", name:"Canada"},
+  {code:"IE", flag:"🇮🇪", name:"Ireland"},
+  {code:"NZ", flag:"🇳🇿", name:"New Zealand"},
+  {code:"ZA", flag:"🇿🇦", name:"South Africa"},
+  {code:"IN", flag:"🇮🇳", name:"India"},
+  {code:"DE", flag:"🇩🇪", name:"Germany"},
+  {code:"FR", flag:"🇫🇷", name:"France"},
+  {code:"ES", flag:"🇪🇸", name:"Spain"},
+  {code:"IT", flag:"🇮🇹", name:"Italy"},
+  {code:"JP", flag:"🇯🇵", name:"Japan"},
+  {code:"BR", flag:"🇧🇷", name:"Brazil"},
+  {code:"MX", flag:"🇲🇽", name:"Mexico"},
+  {code:"SE", flag:"🇸🇪", name:"Sweden"},
+  {code:"CH", flag:"🇨🇭", name:"Switzerland"},
+];
+
 const CURRENCIES = [
   { code:"GBP", symbol:"£",  name:"British Pound" },
   { code:"USD", symbol:"$",  name:"US Dollar" },
@@ -35,10 +55,33 @@ function todayISO() { return toISO(new Date()); }
 function parseISO(iso) { return new Date(iso+"T00:00:00"); }
 function addDaysISO(iso, n) { const d = parseISO(iso); d.setDate(d.getDate()+n); return toISO(d); }
 
-function getLastWorkingDay(year, month) {
+// Bank holiday cache: { "GB-2026": ["2026-01-01", ...] }
+const bankHolidayCache = {};
+
+async function fetchBankHolidays(countryCode, year) {
+  const key = `${countryCode}-${year}`;
+  if(bankHolidayCache[key]) return bankHolidayCache[key];
+  try {
+    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${countryCode}`);
+    if(!res.ok) return [];
+    const data = await res.json();
+    const dates = data.map(h=>h.date);
+    bankHolidayCache[key] = dates;
+    return dates;
+  } catch { return []; }
+}
+
+function getLastWorkingDay(year, month, bankHolidays=[]) {
   let d = new Date(year, month + 1, 0);
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  while (d.getDay() === 0 || d.getDay() === 6 || bankHolidays.includes(toISO(d))) {
+    d.setDate(d.getDate() - 1);
+  }
   return d;
+}
+
+async function getLastWorkingDayAsync(year, month, countryCode) {
+  const holidays = countryCode ? await fetchBankHolidays(countryCode, year) : [];
+  return getLastWorkingDay(year, month, holidays);
 }
 
 // payConfig = { frequency, weekDay (0=Mon..6=Sun), monthDay (1-31 or "last_working"), customDate, anchorDate }
@@ -86,10 +129,12 @@ function getNextPayday(schedule, customDate, payConfig, refDate) {
 
   if (frequency === "monthly") {
     if (monthDay === "last_working") {
-      let payday = getLastWorkingDay(today.getFullYear(), today.getMonth());
+      const bh = payConfig?.bankHolidays ?? [];
+      let payday = getLastWorkingDay(today.getFullYear(), today.getMonth(), bh);
       if (today >= payday) payday = getLastWorkingDay(
         today.getMonth()===11 ? today.getFullYear()+1 : today.getFullYear(),
-        today.getMonth()===11 ? 0 : today.getMonth()+1
+        today.getMonth()===11 ? 0 : today.getMonth()+1,
+        bh
       );
       return toISO(payday);
     }
@@ -115,8 +160,8 @@ function getNextPayday(schedule, customDate, payConfig, refDate) {
 function daysUntilPayday(paydayISO, fromISO) {
   const today = fromISO ? parseISO(fromISO) : new Date(); today.setHours(0,0,0,0);
   const payday = new Date(paydayISO+"T00:00:00"); payday.setHours(0,0,0,0);
-  const diff = Math.ceil((payday - today) / 86400000);
-  return Math.max(diff, 1); // days of spending = days before payday
+  const diff = Math.round((payday - today) / 86400000); // round not ceil to avoid timezone drift
+  return Math.max(diff, 1); // days of spending = days before payday, not including payday
 }
 
 // ─── Bill reservation helpers ─────────────────────────────────────────────────
@@ -963,6 +1008,7 @@ const FAQ_SECTIONS = [
       {q:"How do I switch between Calculator and Pro mode?", a:"Use the toggle at the top of the main screen. The app remembers which mode you were using when you come back."},
       {q:"How is my daily budget calculated?", a:"Your daily budget is set at the start of each day by dividing your current balance by the number of days until payday. It's locked for the entire day so you always have a consistent target to aim for. In Calculator mode you update your balance manually whenever you like and the budget recalculates instantly. In Pro mode it locks in at the start of the day and only changes if you update your balance in Settings."},
       {q:"How do I update my pay schedule or currency?", a:"Tap Settings in the bottom bar. From there you can update your balance, pay schedule, currency and monthly income."},
+      {q:"What is the country setting for?", a:"The country setting is used to apply bank holidays to your payday calculation. It only affects people on the Last working day of the month pay schedule. If your payday would fall on a bank holiday, Day Pay automatically moves it back to the previous working day — so if the last working day is a Friday but that Friday is a bank holiday, payday becomes Thursday instead. All other pay schedules are unaffected."},
       {q:"When does my day reset?", a:"At midnight your day closes automatically. Your balance is updated, a summary appears when you next open the app, and a fresh daily budget is calculated for the new day."},
       {q:"What if I don't open the app for a few days?", a:"No problem — the app automatically catches up on missed days when you next open it. Bills due on those days are deducted, payday is processed if it passed, and your history is updated."},
       {q:"Does Day Pay connect to my bank?", a:"No. Day Pay does not connect to any bank. All data is entered manually and saved locally on your device. Nothing leaves your phone."},
@@ -1037,6 +1083,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
   const [currency,  setCurrency]  = useState(setup.currency);
   const [payConfig, setPayConfig] = useState(setup.payConfig||{frequency:"monthly",monthDay:"last_working"});
   const [showFaq,   setShowFaq]   = useState(false);
+  const [localCountry, setLocalCountry] = useState(setup.country||"GB");
   const sym = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
 
   useEffect(()=>{
@@ -1079,6 +1126,27 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
             </div>
           </div>
 
+          {/* Country — only affects last working day pay schedule */}
+          <div style={{marginBottom:"20px"}}>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"6px"}}>Country</div>
+            <div style={{fontSize:"11px",color:"rgba(255,255,255,0.25)",marginBottom:"10px"}}>Used to apply bank holidays to your pay schedule</div>
+            <select value={localCountry} onChange={e=>setLocalCountry(e.target.value)} style={{
+              width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",
+              borderRadius:"12px",padding:"12px 14px",color:"#fff",
+              fontFamily:"'DM Sans',sans-serif",fontSize:"14px",outline:"none",colorScheme:"dark"
+            }}>
+              {COUNTRIES.map(c=>(
+                <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+              ))}
+            </select>
+            <div style={{background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:"12px",padding:"10px 12px",marginTop:"10px",display:"flex",gap:"8px",alignItems:"flex-start"}}>
+              <span style={{fontSize:"14px",flexShrink:0}}>💡</span>
+              <div style={{fontSize:"11px",color:"rgba(255,255,255,0.45)",lineHeight:1.7}}>
+                Only affects <span style={{color:"#34D399",fontWeight:"600"}}>Last working day of the month</span> pay schedules. If your payday falls on a bank holiday, Day Pay automatically moves it to the previous working day.
+              </div>
+            </div>
+          </div>
+
           {/* Pay schedule */}
           <div style={{marginBottom:"20px"}}>
             <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Pay Schedule</div>
@@ -1108,7 +1176,7 @@ function SettingsSheet({ open, onClose, setup, onSave }) {
           <button onClick={()=>{
             const bal=parseFloat(balance)||0;
             const sal=parseFloat(salary)||0;
-            if(bal>0) onSave({currentBalance:bal,monthlySalary:sal,currency,payConfig});
+            if(bal>0) onSave({currentBalance:bal,monthlySalary:sal,currency,payConfig,country:localCountry});
             onClose();
           }} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:"16px",color:"#fff",fontFamily:"'DM Sans',sans-serif",fontWeight:"700",fontSize:"16px",cursor:"pointer",boxShadow:"0 6px 24px rgba(167,139,250,0.3)"}}>
             Save Changes
@@ -1301,6 +1369,8 @@ export default function DayPay() {
   const [paydayModal,        setPaydayModal]        = useState(saved?.pendingPayday   ?? null);
   const [lastClosedDate,     setLastClosedDate]     = useState(saved?.lastClosedDate  ?? todayISO());
   const [showBudgetTip,      setShowBudgetTip]      = useState(false);
+  const [country,            setCountry]            = useState(saved?.country ?? "GB");
+  const [bankHolidays,       setBankHolidays]       = useState(saved?.bankHolidays ?? []);
   const [appMode,            setAppMode]            = useState(saved?.appMode            ?? "pro"); // "calculator" or "pro"
   const [showUpdateBalance,  setShowUpdateBalance]  = useState(false);
   const [balanceLog,         setBalanceLog]         = useState(saved?.balanceLog ?? []);
@@ -1475,7 +1545,7 @@ export default function DayPay() {
 
   const { currency, currentBalance, nextPayday: storedPayday, paySchedule, customPayDate, monthlySalary } = setup;
   const sym      = CURRENCIES.find(c=>c.code===currency)?.symbol||"£";
-  const payday   = storedPayday || getNextPayday(null, null, setup.payConfig);
+  const payday   = storedPayday || getNextPayday(null, null, {...(setup.payConfig||{}), bankHolidays});
   const days     = daysUntilPayday(payday);
   // Money set aside for bills due between tomorrow and payday
   const reservedBills   = reservedForBills(bills, payday);
